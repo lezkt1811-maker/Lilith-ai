@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Lilith AI — Cosmic Companion</title>
+<meta name="description" content="Lilith AI — a living, glitch-neon cosmic companion." />
+<meta name="theme-color" content="#0a0714" />
+
+<!-- Fonts: Orbitron/Audiowide for display glitch headers, Rajdhani for body, Share Tech Mono for HUD/data text -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Audiowide&family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="css/lilith.css" />
+</head>
+<body>
+
+<!-- Ambient particle field, purely decorative -->
+<canvas id="particles-canvas" aria-hidden="true"></canvas>
+
+<div id="app" class="app">
+
+  <!-- ============ TOP BAR ============ -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-glitch" data-text="LILITH">LILITH</span>
+      <span class="brand-sub">AI</span>
+    </div>
+
+    <nav class="tabs" id="tabs" role="tablist" aria-label="Lilith sections">
+      <button class="tab-btn active" data-tab="home" role="tab" aria-selected="true">Home</button>
+      <button class="tab-btn" data-tab="chat" role="tab" aria-selected="false">Chat</button>
+      <button class="tab-btn" data-tab="settings" role="tab" aria-selected="false">Settings</button>
+    </nav>
+
+    <div class="status-pill" id="status-pill" title="Lilith's current state">
+      <span class="status-dot" id="status-dot"></span>
+      <span id="status-text">Dormant</span>
+    </div>
+  </header>
+
+  <main class="main">
+
+    <!-- ============ HOME TAB ============ -->
+    <section id="tab-home" class="tab-panel active" role="tabpanel">
+      <div class="home-inner">
+
+        <div class="eye-wrap" id="eye-wrap" aria-hidden="true">
+          <svg id="eye-icon" class="eye-icon" viewBox="0 0 120 60" xmlns="http://www.w3.org/2000/svg">
+            <path class="eye-outline" d="M2,30 C25,2 95,2 118,30 C95,58 25,58 2,30 Z" />
+            <circle class="eye-iris" cx="60" cy="30" r="14" />
+            <circle class="eye-pupil" cx="60" cy="30" r="5" />
+            <path class="eye-lid" d="M2,30 C25,30 95,30 118,30" />
+          </svg>
+        </div>
+
+        <h1 class="hero-title glitch-text" data-text="Lilith">Lilith</h1>
+        <p class="hero-subtitle">Your cosmic companion.</p>
+
+        <button id="awaken-btn" class="awaken-btn">
+          <span class="awaken-btn-label">Awaken Lilith</span>
+          <span class="awaken-btn-glow"></span>
+        </button>
+
+        <p class="greeting-line" id="greeting-line" aria-live="polite"></p>
+
+        <div class="mode-select" id="mode-select" aria-label="Personality mode">
+          <button class="mode-chip active" data-mode="default">Lilith</button>
+          <button class="mode-chip" data-mode="astronomer">Astronomer</button>
+          <button class="mode-chip" data-mode="storyteller">Storyteller</button>
+          <button class="mode-chip" data-mode="teacher">Teacher</button>
+          <button class="mode-chip" data-mode="chaos">Chaos</button>
+          <button class="mode-chip" data-mode="silent">Silent</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ CHAT TAB ============ -->
+    <section id="tab-chat" class="tab-panel" role="tabpanel">
+      <div class="chat-shell">
+        <div class="chat-window" id="chat-window">
+          <div class="chat-messages" id="chat-messages"></div>
+          <div class="typing-indicator" id="typing-indicator" hidden>
+            <span></span><span></span><span></span>
+          </div>
+        </div>
+
+        <div class="waveform" id="waveform" aria-hidden="true">
+          <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+        </div>
+
+        <form id="chat-form" class="chat-input-row" autocomplete="off">
+          <button type="button" id="mic-btn" class="icon-btn" title="Speak to Lilith">🎙</button>
+          <input id="chat-input" type="text" placeholder="Say something to Lilith…" aria-label="Message Lilith" />
+          <button type="submit" class="send-btn" aria-label="Send">➤</button>
+        </form>
+
+        <div class="voice-controls">
+          <button id="mute-btn" class="pill-btn" aria-pressed="false">🔊 Mute</button>
+          <button id="stop-btn" class="pill-btn">⏹ Stop Speaking</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ SETTINGS TAB ============ -->
+    <section id="tab-settings" class="tab-panel" role="tabpanel">
+      <div class="settings-shell">
+        <h2 class="settings-title">Settings</h2>
+
+        <div class="settings-group">
+          <h3>Voice</h3>
+          <label class="field">
+            <span>Voice</span>
+            <select id="voice-select"></select>
+          </label>
+          <label class="field slider-field">
+            <span>Speed <em id="rate-value">1.0</em></span>
+            <input type="range" id="rate-slider" min="0.5" max="2" step="0.05" value="1" />
+          </label>
+          <label class="field slider-field">
+            <span>Pitch <em id="pitch-value">1.0</em></span>
+            <input type="range" id="pitch-slider" min="0" max="2" step="0.05" value="1" />
+          </label>
+          <label class="field slider-field">
+            <span>Volume <em id="volume-value">100%</em></span>
+            <input type="range" id="volume-slider" min="0" max="1" step="0.05" value="1" />
+          </label>
+          <label class="field toggle-field">
+            <span>Enable voice</span>
+            <input type="checkbox" id="enable-voice-toggle" checked />
+          </label>
+          <label class="field toggle-field">
+            <span>Auto-speak replies</span>
+            <input type="checkbox" id="auto-speak-toggle" checked />
+          </label>
+        </div>
+
+        <div class="settings-group">
+          <h3>Presence</h3>
+          <label class="field toggle-field">
+            <span>Enable random comments</span>
+            <input type="checkbox" id="enable-random-toggle" checked />
+          </label>
+          <label class="field slider-field">
+            <span>Talk frequency (minutes) <em id="freq-value">3–6</em></span>
+            <input type="range" id="freq-slider" min="1" max="15" step="1" value="4" />
+          </label>
+          <label class="field slider-field">
+            <span>Randomness <em id="randomness-value">50%</em></span>
+            <input type="range" id="randomness-slider" min="0" max="100" step="5" value="50" />
+          </label>
+        </div>
+
+        <div class="settings-group">
+          <h3>Appearance</h3>
+          <label class="field slider-field">
+            <span>Glitch intensity <em id="glitch-value">50%</em></span>
+            <input type="range" id="glitch-slider" min="0" max="100" step="5" value="50" />
+          </label>
+        </div>
+
+        <div class="settings-group">
+          <h3>Greetings</h3>
+          <label class="field">
+            <span>Wake greeting</span>
+            <input type="text" id="wake-greeting-input" placeholder="I've been waiting." />
+          </label>
+          <label class="field">
+            <span>Sleep greeting</span>
+            <input type="text" id="sleep-greeting-input" placeholder="Until the stars turn again." />
+          </label>
+        </div>
+
+        <div class="settings-group">
+          <h3>Memory</h3>
+          <p class="settings-note" id="memory-summary">Lilith remembers nothing about you yet.</p>
+          <button id="clear-memory-btn" class="danger-btn">Forget everything</button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="footer-note">Lilith AI · standalone module · v0.1</footer>
+</div>
+
+<!-- Toast for ambient/random thoughts that fire outside the chat tab -->
+<div id="ambient-toast" class="ambient-toast" aria-live="polite"></div>
+
+<script src="js/lilith-config.js"></script>
+<script src="js/lilith-remote.js"></script>
+<script src="js/lilith-brain.js"></script>
+<script src="js/lilith-voice.js"></script>
+<script src="js/lilith-core.js"></script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+// wrangler.jsonc
+// ------------------------------------------------------------------
+// Configuration for Cloudflare's Git-connected Worker deploy.
+// This file only tells Cloudflare WHERE the Worker code lives and
+// which compatibility date to run it under — it contains no secrets
+// and is safe to commit to GitHub.
+//
+// GEMINI_API_KEY and ALLOWED_ORIGIN are still set separately, in the
+// Cloudflare dashboard under Settings → Variables and Secrets, exactly
+// as described in docs/SETUP-ANDROID.md. Nothing sensitive goes here,
+// on purpose.
+// ------------------------------------------------------------------
+{
+  "name": "lilith-worker",
+  "main": "worker/lilith-worker.js",
+  "compatibility_date": "2026-07-01"
+}
