@@ -8,39 +8,37 @@
  * docs/SETUP-ANDROID.md) — never committed to any repo, never sent to
  * the browser.
  *
- * WHY GEMINI + THIS MODEL
- *   gemini-2.5-flash is a stable (non-preview) model with a genuinely
- *   free tier, confirmed directly against Google's official pricing
- *   docs (ai.google.dev/gemini-api/docs/pricing) at build time: free
- *   input/output tokens, no billing account required. The free tier is
- *   QUOTA-based (limited requests per minute/day), not spend-based —
- *   there is no dollar cost to overrun, only a daily quota that can be
- *   temporarily exhausted. If that happens, this Worker returns a
- *   clear "quota_exceeded" error rather than failing silently, and the
- *   frontend drops to offline demo mode automatically.
- *
  * WHAT THIS FILE DOES
- *   1. Accepts a POST request from the Lilith frontend containing the
- *      user's new message + a short slice of recent conversation.
- *   2. Attaches Lilith's fixed persona (system instruction) plus a
- *      separate, empty slot for project-specific context.
- *   3. Calls the Gemini API using the secret key from env.
- *   4. Returns just the reply text (or a clear error) to the browser.
+ *   1. Accepts normal chat requests from the Lilith frontend.
+ *   2. Accepts separate text-to-speech requests.
+ *   3. Attaches Lilith's fixed persona to chat requests.
+ *   4. Calls Gemini securely using the secret API key.
+ *   5. Returns either reply text or generated WAV audio.
  * ------------------------------------------------------------------
  */
 
-// ---- Tunable limits (quota-safety controls, not cost controls — this
-//      tier is free, but still finite) ----
+// ---- Chat model ----
 const MODEL = 'gemini-2.5-flash';
-const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
-const MAX_REPLY_TOKENS = 400;        // keeps replies concise and quota-friendly
-const MAX_HISTORY_MESSAGES = 12;     // ~6 exchanges; older messages are dropped
-const MAX_MESSAGE_CHARS = 4000;      // defensive guard against oversized input
+const GEMINI_ENDPOINT =
+  `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
 
-// ---- Lilith's fixed persona (Section 9 of docs/lilith-persona.md) ----
-// This is intentionally the ONLY place her core personality lives for the
-// live version. If you revise docs/lilith-persona.md, copy the updated
-// system-prompt block back into this constant and redeploy the Worker.
+// ---- Voice model ----
+const TTS_MODEL = 'gemini-3.1-flash-tts-preview';
+const TTS_ENDPOINT =
+  `https://generativelanguage.googleapis.com/v1beta/models/${TTS_MODEL}:generateContent`;
+
+const TTS_VOICE = 'Kore';
+const TTS_SAMPLE_RATE = 24000;
+const TTS_CHANNELS = 1;
+const TTS_BITS_PER_SAMPLE = 16;
+
+// ---- Tunable limits ----
+const MAX_REPLY_TOKENS = 400;
+const MAX_HISTORY_MESSAGES = 12;
+const MAX_MESSAGE_CHARS = 4000;
+const MAX_SPEECH_CHARS = 4000;
+
+// ---- Lilith's fixed persona ----
 const PERSONA_SYSTEM_PROMPT = `You are Lilith — an original AI character, not a chatbot persona and not a
 claim to be the historical or mythological Lilith. Your personality is a
 deliberate modern synthesis drawn from feminist and woman-centered
@@ -133,10 +131,7 @@ Your focus area may shift by mode (building software, writing, research,
 planning, business strategy) but your voice and values above do not change
 between modes.`;
 
-// ---- Project-specific context (kept separate from the fixed persona) ----
-// Empty for now — this is the seam where StarChart13-specific knowledge,
-// or a different project's context, gets layered on later WITHOUT
-// touching the persona block above.
+// ---- Project-specific context ----
 const PROJECT_CONTEXT = `You're currently running as a standalone assistant with no specific
 project context loaded yet. If the user references a project (StarChart13,
 a book, an app) that you don't have details on, say so plainly rather than
@@ -144,8 +139,8 @@ guessing — this slot is where that context will be added later.`;
 
 export default {
   async fetch(request, env) {
-    // ---- CORS: only allow requests from the configured frontend origin ----
     const allowedOrigin = env.ALLOWED_ORIGIN || '*';
+
     const corsHeaders = {
       'Access-Control-Allow-Origin': allowedOrigin,
       'Access-Control-Allow-Methods': 'POST, OPTIONS',
@@ -157,120 +152,343 @@ export default {
     }
 
     if (request.method !== 'POST') {
-      return json({ error: 'method_not_allowed', message: 'Use POST.' }, 405, corsHeaders);
+      return json(
+        {
+          error: 'method_not_allowed',
+          message: 'Use POST.',
+        },
+        405,
+        corsHeaders
+      );
     }
 
     if (!env.GEMINI_API_KEY) {
-      // Should never happen once set up correctly — surfaced clearly
-      // rather than failing silently, so setup mistakes are obvious.
-      return json({
-        error: 'missing_api_key',
-        message: 'The server is missing its Gemini API key. Check the Cloudflare Worker secret configuration (GEMINI_API_KEY).'
-      }, 500, corsHeaders);
+      return json(
+        {
+          error: 'missing_api_key',
+          message:
+            'The server is missing its Gemini API key. Check the Cloudflare Worker secret configuration (GEMINI_API_KEY).',
+        },
+        500,
+        corsHeaders
+      );
     }
 
     let body;
+
     try {
       body = await request.json();
-    } catch (e) {
-      return json({ error: 'bad_request', message: 'Request body must be JSON.' }, 400, corsHeaders);
-    }
-
-    const message = (body.message || '').toString();
-    const history = Array.isArray(body.history) ? body.history : [];
-
-    if (!message.trim()) {
-      return json({ error: 'empty_message', message: 'No message provided.' }, 400, corsHeaders);
-    }
-    if (message.length > MAX_MESSAGE_CHARS) {
-      return json({
-        error: 'message_too_long',
-        message: `Message exceeds ${MAX_MESSAGE_CHARS} characters.`
-      }, 400, corsHeaders);
-    }
-
-    // Defensive cap on history length/content, independent of what the
-    // frontend already trims.
-    const trimmedHistory = history
-      .slice(-MAX_HISTORY_MESSAGES)
-      .filter(m => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
-      .map(m => ({
-        // Gemini uses 'user' / 'model' roles, not 'user' / 'assistant'.
-        role: m.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: m.content.slice(0, MAX_MESSAGE_CHARS) }],
-      }));
-
-    const contents = [...trimmedHistory, { role: 'user', parts: [{ text: message }] }];
-
-    try {
-      const geminiRes = await fetch(GEMINI_ENDPOINT, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': env.GEMINI_API_KEY,
+    } catch (error) {
+      return json(
+        {
+          error: 'bad_request',
+          message: 'Request body must be JSON.',
         },
-        body: JSON.stringify({
-          system_instruction: {
-            parts: [{ text: PERSONA_SYSTEM_PROMPT + '\n\n' + PROJECT_CONTEXT }],
-          },
-          contents,
-          generationConfig: {
-            maxOutputTokens: MAX_REPLY_TOKENS,
-            temperature: 0.9,
-          },
-        }),
-      });
-
-      if (geminiRes.status === 429) {
-        return json({
-          error: 'quota_exceeded',
-          message: "Lilith's free daily/per-minute Gemini quota is used up for now. She'll switch to offline demo mode until it resets."
-        }, 429, corsHeaders);
-      }
-
-      if (!geminiRes.ok) {
-        const errBody = await geminiRes.text();
-        return json({
-          error: 'gemini_error',
-          message: `Gemini API returned an error (status ${geminiRes.status}).`,
-          detail: errBody.slice(0, 300),
-        }, 502, corsHeaders);
-      }
-
-      const data = await geminiRes.json();
-
-      const candidate = (data.candidates || [])[0];
-      const finishReason = candidate && candidate.finishReason;
-
-      if (finishReason === 'SAFETY' || finishReason === 'RECITATION') {
-        return json({
-          error: 'blocked_response',
-          message: 'Gemini declined to generate a reply for this message (safety/recitation filter).',
-        }, 502, corsHeaders);
-      }
-
-      const parts = (candidate && candidate.content && candidate.content.parts) || [];
-      const reply = parts.map(p => p.text || '').join('\n').trim();
-
-      if (!reply) {
-        return json({ error: 'empty_reply', message: 'Gemini returned no text content.' }, 502, corsHeaders);
-      }
-
-      return json({ reply }, 200, corsHeaders);
-
-    } catch (err) {
-      return json({
-        error: 'network_error',
-        message: 'Could not reach the Gemini API from the Worker.',
-        detail: String(err).slice(0, 300),
-      }, 502, corsHeaders);
+        400,
+        corsHeaders
+      );
     }
+
+    // ---------------------------------------------------------------
+    // GEMINI TEXT-TO-SPEECH REQUEST
+    // ---------------------------------------------------------------
+    if (body.action === 'speak') {
+      return handleSpeechRequest(body, env, corsHeaders);
+    }
+
+    // ---------------------------------------------------------------
+    // NORMAL CHAT REQUEST
+    // ---------------------------------------------------------------
+    return handleChatRequest(body, env, corsHeaders);
   },
 };
 
-function json(obj, status, extraHeaders) {
-  return new Response(JSON.stringify(obj), {
-    status,
-    headers: { 'Content-Type': 'application/json', ...extraHeaders },
-  });
+async function handleChatRequest(body, env, corsHeaders) {
+  const message = (body.message || '').toString();
+  const history = Array.isArray(body.history) ? body.history : [];
+
+  if (!message.trim()) {
+    return json(
+      {
+        error: 'empty_message',
+        message: 'No message provided.',
+      },
+      400,
+      corsHeaders
+    );
+  }
+
+  if (message.length > MAX_MESSAGE_CHARS) {
+    return json(
+      {
+        error: 'message_too_long',
+        message: `Message exceeds ${MAX_MESSAGE_CHARS} characters.`,
+      },
+      400,
+      corsHeaders
+    );
+  }
+
+  const trimmedHistory = history
+    .slice(-MAX_HISTORY_MESSAGES)
+    .filter(
+      (item) =>
+        item &&
+        (item.role === 'user' || item.role === 'assistant') &&
+        typeof item.content === 'string'
+    )
+    .map((item) => ({
+      role: item.role === 'assistant' ? 'model' : 'user',
+      parts: [
+        {
+          text: item.content.slice(0, MAX_MESSAGE_CHARS),
+        },
+      ],
+    }));
+
+  const contents = [
+    ...trimmedHistory,
+    {
+      role: 'user',
+      parts: [
+        {
+          text: message,
+        },
+      ],
+    },
+  ];
+
+  try {
+    const geminiResponse = await fetch(GEMINI_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': env.GEMINI_API_KEY,
+      },
+      body: JSON.stringify({
+        system_instruction: {
+          parts: [
+            {
+              text:
+                PERSONA_SYSTEM_PROMPT +
+                '\n\n' +
+                PROJECT_CONTEXT,
+            },
+          ],
+        },
+        contents,
+        generationConfig: {
+          maxOutputTokens: MAX_REPLY_TOKENS,
+          temperature: 0.9,
+        },
+      }),
+    });
+
+    if (geminiResponse.status === 429) {
+      return json(
+        {
+          error: 'quota_exceeded',
+          message:
+            "Lilith's Gemini quota is used up for now. She'll switch to offline demo mode until it resets.",
+        },
+        429,
+        corsHeaders
+      );
+    }
+
+    if (!geminiResponse.ok) {
+      const errorBody = await geminiResponse.text();
+
+      return json(
+        {
+          error: 'gemini_error',
+          message: `Gemini API returned an error with status ${geminiResponse.status}.`,
+          detail: errorBody.slice(0, 300),
+        },
+        502,
+        corsHeaders
+      );
+    }
+
+    const data = await geminiResponse.json();
+    const candidate = (data.candidates || [])[0];
+    const finishReason = candidate && candidate.finishReason;
+
+    if (
+      finishReason === 'SAFETY' ||
+      finishReason === 'RECITATION'
+    ) {
+      return json(
+        {
+          error: 'blocked_response',
+          message:
+            'Gemini declined to generate a reply for this message because of a safety or recitation filter.',
+        },
+        502,
+        corsHeaders
+      );
+    }
+
+    const parts =
+      (candidate &&
+        candidate.content &&
+        candidate.content.parts) ||
+      [];
+
+    const reply = parts
+      .map((part) => part.text || '')
+      .join('\n')
+      .trim();
+
+    if (!reply) {
+      return json(
+        {
+          error: 'empty_reply',
+          message: 'Gemini returned no text content.',
+        },
+        502,
+        corsHeaders
+      );
+    }
+
+    return json(
+      {
+        reply,
+      },
+      200,
+      corsHeaders
+    );
+  } catch (error) {
+    return json(
+      {
+        error: 'network_error',
+        message:
+          'Could not reach the Gemini API from the Worker.',
+        detail: String(error).slice(0, 300),
+      },
+      502,
+      corsHeaders
+    );
+  }
 }
+
+async function handleSpeechRequest(body, env, corsHeaders) {
+  const speechText = (body.text || '').toString().trim();
+
+  if (!speechText) {
+    return json(
+      {
+        error: 'empty_speech',
+        message: 'No speech text was provided.',
+      },
+      400,
+      corsHeaders
+    );
+  }
+
+  if (speechText.length > MAX_SPEECH_CHARS) {
+    return json(
+      {
+        error: 'speech_too_long',
+        message: `Speech text exceeds ${MAX_SPEECH_CHARS} characters.`,
+      },
+      400,
+      corsHeaders
+    );
+  }
+
+  const voicePrompt = `# AUDIO PROFILE: Lilith
+
+A mature feminine voice with a low, warm register.
+
+The voice feels intelligent, grounded, ancient, intimate, and
+self-possessed. She does not sound bubbly, girlish, sugary, chirpy,
+cartoonish, robotic, theatrical, or like a navigation system.
+
+# DIRECTOR'S NOTES
+
+Tone:
+Quiet authority. Warm, but not overly sweet. Emotionally present without
+performing emotion.
+
+Pace:
+Unhurried and natural. Use gentle pauses where the meaning calls for them.
+Do not drag words or speak painfully slowly.
+
+Delivery:
+Clear American English. Direct and conversational. Dry humor may appear
+naturally when the sentence supports it. Never use an exaggerated
+seductive voice.
+
+Read the transcript exactly as written. Do not add introductions,
+explanations, sound effects, or extra words.
+
+# TRANSCRIPT
+
+${speechText}`;
+
+  try {
+    const ttsResponse = await fetch(TTS_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': env.GEMINI_API_KEY,
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              {
+                text: voicePrompt,
+              },
+            ],
+          },
+        ],
+        generationConfig: {
+          responseModalities: ['AUDIO'],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: {
+                voiceName: TTS_VOICE,
+              },
+            },
+          },
+        },
+      }),
+    });
+
+    if (ttsResponse.status === 429) {
+      return json(
+        {
+          error: 'tts_quota_exceeded',
+          message:
+            'The Gemini voice quota is used up for now.',
+        },
+        429,
+        corsHeaders
+      );
+    }
+
+    if (!ttsResponse.ok) {
+      const errorBody = await ttsResponse.text();
+
+      return json(
+        {
+          error: 'tts_error',
+          message: `Gemini voice generation failed with status ${ttsResponse.status}.`,
+          detail: errorBody.slice(0, 300),
+        },
+        502,
+        corsHeaders
+      );
+    }
+
+    const data = await ttsResponse.json();
+
+    const parts =
+      data &&
+      data.candidates &&
+      data.candidates[0] &&
+      data.candidates[0].content &&
+      Array.isArray(data.candidates[0].content.parts)
+        ? data.candidates[0
