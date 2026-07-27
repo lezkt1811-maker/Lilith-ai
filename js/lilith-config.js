@@ -12,5 +12,5 @@
 window.LILITH_CONFIG = {
   // Paste your deployed Worker URL here, e.g.:
   // 'https://lilith-worker.YOUR-SUBDOMAIN.workers.dev'
-  WORKER_URL: '',
+  WORKER_URL: 'https://lilith-ai.lezkt1811.workers.dev',
 };
