@@ -492,3 +492,60 @@ ${speechText}`;
       data.candidates[0].content &&
       Array.isArray(data.candidates[0].content.parts)
         ? data.candidates[0
+          )
+      ? data.candidates[0].content.parts
+      : [];
+
+    let audioBase64 = null;
+
+    for (const part of parts) {
+      if (part.inlineData && part.inlineData.data) {
+        audioBase64 = part.inlineData.data;
+        break;
+      }
+    }
+
+    if (!audioBase64) {
+      return json(
+        {
+          error: 'no_audio_returned',
+          message: 'The model did not return audio data.',
+        },
+        502,
+        corsHeaders
+      );
+    }
+
+    return json(
+      {
+        audio: audioBase64,
+        sampleRate: TTS_SAMPLE_RATE,
+        channels: TTS_CHANNELS,
+        bitsPerSample: TTS_BITS_PER_SAMPLE,
+      },
+      200,
+      corsHeaders
+    );
+  } catch (error) {
+    return json(
+      {
+        error: 'tts_network_error',
+        message: 'Could not reach the Gemini TTS endpoint from the Worker.',
+        detail: String(error).slice(0, 300),
+      },
+        502,
+        corsHeaders
+    );
+  }
+}
+
+function json(payload, status = 200, extraHeaders = {}) {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: {
+      'Content-Type': 'application/json',
+      ...extraHeaders,
+    },
+  });
+}
+
