@@ -491,10 +491,8 @@ ${speechText}`;
       data.candidates[0] &&
       data.candidates[0].content &&
       Array.isArray(data.candidates[0].content.parts)
-        ? data.candidates[0
-          )
-      ? data.candidates[0].content.parts
-      : [];
+        ? data.candidates[0].content.parts
+        : [];
 
     let audioBase64 = null;
 
