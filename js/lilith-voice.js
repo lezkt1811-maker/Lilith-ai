@@ -22,7 +22,7 @@ const WorkerAudioProvider = {
         fetch(global.LILITH_CONFIG.WORKER_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: text })
+            body: JSON.stringify({ action: 'speak', text: text })
         })
         .then(res => res.json())
         .then(data => {
