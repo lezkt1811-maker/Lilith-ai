@@ -18,7 +18,7 @@
  */
 
 // ---- Chat model ----
-const MODEL = 'gemini-flash-latest';
+const MODEL = 'gemini-flash-lite-latest';
 const GEMINI_ENDPOINT =
   `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
 
