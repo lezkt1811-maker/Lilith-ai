@@ -298,6 +298,7 @@ async function handleChatRequest(body, env, corsHeaders) {
 
     if (!geminiResponse.ok) {
       const errorBody = await geminiResponse.text();
+      console.error('Gemini API error', geminiResponse.status, errorBody.slice(0, 500));
 
       return json(
         {
@@ -546,3 +547,4 @@ function json(payload, status = 200, extraHeaders = {}) {
     },
   });
 }
+
