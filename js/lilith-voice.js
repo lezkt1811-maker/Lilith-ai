@@ -94,7 +94,7 @@ function speak(text, opts = {}, callbacks = {}) {
         audio.onended = finish;
         audio.onerror = finish;
         // Start her on-screen face (mouth and captions) just before the voice plays.
-        if (global.LilithFace) global.LilithFace.start(audio, text);
+        if (global.LilithFace) global.LilithFace.attach(audio);
         return audio.play();
     })
     .catch(err => {

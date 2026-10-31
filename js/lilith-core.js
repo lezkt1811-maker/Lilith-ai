@@ -277,6 +277,8 @@
     // Ask for her voice right away, so it's ready as the words appear
     // (before, it waited for the text animation to finish first).
     speakIfEnabled(reply);
+    // Start the mouth and words after the voice request is made (that request resets the face).
+    if (window.LilithFace) LilithFace.talk(reply);
     await typeOutBubble(reply);
     if (!lilithSpeaking) finishRest(); // if her voice already ended or never started
   }
