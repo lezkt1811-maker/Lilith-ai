@@ -62,7 +62,10 @@ html, body {
 .app {
   position: relative;
   z-index: 1;
-  min-height: 100dvh;
+  /* Exactly one screen tall, so the chat messages scroll inside their own box
+     and Lilith's face stays in view at the top. */
+  height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
 }
