@@ -24,7 +24,8 @@
     talkFrequencyMinutes: 4,
     randomness: 50,
     glitchIntensity: 50,
-    wakeGreeting: ''
+    wakeGreeting: '',
+    sleepGreeting: ''
   };
 
   function loadSettings() {
@@ -78,6 +79,7 @@
     randomnessSlider: $('#randomness-slider'), randomnessValue: $('#randomness-value'),
     glitchSlider: $('#glitch-slider'), glitchValue: $('#glitch-value'),
     wakeGreetingInput: $('#wake-greeting-input'),
+    sleepGreetingInput: $('#sleep-greeting-input'),
     memorySummary: $('#memory-summary'),
     clearMemoryBtn: $('#clear-memory-btn')
   };
@@ -111,11 +113,14 @@
   /* =========================================================
    * AWAKEN / SLEEP
    * ========================================================= */
+  els.awakenBtn.addEventListener('click', () => {
+    awake ? goToSleep() : awaken();
+  });
+
   function awaken() {
     awake = true;
     els.awakenBtn.classList.add('is-awake');
-    els.awakenBtn.disabled = true;
-    els.awakenBtn.querySelector('.awaken-btn-label').textContent = 'Lilith is awake';
+    els.awakenBtn.querySelector('.awaken-btn-label').textContent = 'Return Lilith to Sleep';
     els.statusPill.classList.add('awake');
     els.eyeWrap.classList.add('blinking');
     els.eyeWrap.classList.remove('asleep');
@@ -127,8 +132,23 @@
     updateStatusLabel();
   }
 
+  function goToSleep() {
+    awake = false;
+    els.awakenBtn.classList.remove('is-awake');
+    els.awakenBtn.querySelector('.awaken-btn-label').textContent = 'Awaken Lilith';
+    els.statusPill.classList.remove('awake', 'speaking');
+    els.eyeWrap.classList.remove('blinking');
+    els.eyeWrap.classList.add('asleep');
+
+    const line = LilithBrain.sleepGreeting(settings.sleepGreeting);
+    els.greetingLine.textContent = line;
+    LilithVoice.stopSpeaking();
+    clearTimeout(randomThoughtTimer);
+    updateStatusLabel();
+  }
+
   function updateStatusLabel() {
-    if (!awake) { els.statusText.textContent = 'Starting…'; return; }
+    if (!awake) { els.statusText.textContent = 'Dormant'; return; }
     if (!LilithRemote.configured()) { els.statusText.textContent = 'Awake · Demo mode'; return; }
     els.statusText.textContent = usingOfflineFallback ? 'Awake · Offline demo' : 'Awake · Connected';
   }
@@ -484,6 +504,8 @@
 
   els.wakeGreetingInput.value = settings.wakeGreeting;
   els.wakeGreetingInput.addEventListener('input', () => { settings.wakeGreeting = els.wakeGreetingInput.value; saveSettings(); });
+  els.sleepGreetingInput.value = settings.sleepGreeting;
+  els.sleepGreetingInput.addEventListener('input', () => { settings.sleepGreeting = els.sleepGreetingInput.value; saveSettings(); });
 
   els.clearMemoryBtn.addEventListener('click', async () => {
     LilithBrain.memory.clear();
@@ -568,7 +590,7 @@
   })();
 
   /* initial UI state */
-  awaken(); // Lilith is always awake
+  els.eyeWrap.classList.add('asleep');
   // Memory is fetched from the server only when the Settings tab opens,
   // so page load makes no extra network calls.
   els.memorySummary.textContent = 'Open this tab to see what Lilith remembers.';
