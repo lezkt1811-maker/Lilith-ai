@@ -615,8 +615,7 @@ input[type="range"] { accent-color: var(--purple); width: 100%; }
 .face-wrap {
   position: relative;
   width: min(72vw, 300px);
-  /* Shows the top 74% of the picture, which hides the "NeonLilith" wordmark at the bottom. */
-  aspect-ratio: 1024 / 1136;
+  aspect-ratio: 1024 / 1536;
   margin: 0 auto 10px;
   overflow: hidden;
   border-radius: 14px;
@@ -627,18 +626,16 @@ input[type="range"] { accent-color: var(--purple); width: 100%; }
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: top center;
   border-radius: 14px;
   box-shadow: 0 0 24px rgba(157, 59, 255, 0.45);
 }
-/* Mouth sits on the lips in the portrait (about 628px down a 1536px picture,
-   which is 55% of the cropped height shown here). Percentages keep it on the
-   lips at any screen size. */
+/* Mouth sits on the lips of the new picture (centre about x 376, y 570 of 1024 x 1536).
+   Percentages keep it on the lips at any screen size. */
 .face-mouth {
   position: absolute;
-  left: 50%;
-  top: 55.3%;
-  width: 5.2%;
+  left: 36.3%;
+  top: 37%;
+  width: 7.5%;
   height: 0%;
   transform: translate(-50%, -50%);
   background: radial-gradient(ellipse at center, #3a0012 0%, #12000a 80%);
