@@ -20,7 +20,7 @@
     mode: 'default',
     enableVoice: true,
     autoSpeak: true,
-    voiceName: 'Kore',
+    voiceName: 'Despina',
     warmth: 50,
     energy: 50,
     pace: 50,
