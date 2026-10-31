@@ -695,3 +695,27 @@ input[type="range"] { accent-color: var(--purple); width: 100%; }
 .chat-input-row #chat-input { flex: 1 1 0; min-width: 0; width: 100%; }
 .chat-input-row { max-width: 100%; box-sizing: border-box; }
 
+/* ---------- Chat screen look: the new poster as the background ---------- */
+#tab-chat.active {
+  background:
+    linear-gradient(rgba(5, 2, 10, 0.05), rgba(5, 2, 10, 0.25)),
+    url('../assets/lilith-chat-bg.png') center top / cover no-repeat;
+}
+/* The poster already shows her, so the small portrait is hidden on this screen */
+#tab-chat .chat-face-col { display: none; }
+#tab-chat .chat-top > .chat-window {
+  background: rgba(10, 4, 20, 0.22);
+  border: 1px solid rgba(192, 132, 252, 0.55);
+  box-shadow: 0 0 18px rgba(168, 85, 247, 0.35);
+}
+/* A bigger text box */
+.chat-input-row {
+  min-height: 60px;
+  padding: 8px 10px;
+}
+.chat-input-row #chat-input {
+  font-size: 1.15rem;
+  padding: 12px 14px;
+  min-height: 44px;
+}
+
