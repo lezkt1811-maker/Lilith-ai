@@ -19,6 +19,7 @@ let currentRequest = 0; // bumped on every speak/stop, so a late reply never pla
 
 function stopCurrentAudio() {
     currentRequest++;
+    if (global.LilithFace) global.LilithFace.stop();
     if (currentAudio) {
         currentAudio.onended = null;
         currentAudio.onerror = null;
@@ -87,10 +88,13 @@ function speak(text, opts = {}, callbacks = {}) {
         const finish = () => {
             URL.revokeObjectURL(url);
             if (currentAudio === audio) currentAudio = null;
+            if (global.LilithFace) global.LilithFace.stop();
             if (callbacks.onend) callbacks.onend();
         };
         audio.onended = finish;
         audio.onerror = finish;
+        // Start her on-screen face (mouth and captions) just before the voice plays.
+        if (global.LilithFace) global.LilithFace.start(audio, text);
         return audio.play();
     })
     .catch(err => {

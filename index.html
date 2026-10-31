@@ -46,14 +46,11 @@
     <section id="tab-home" class="tab-panel active" role="tabpanel">
       <div class="home-inner">
 
-        <div class="eye-wrap" id="eye-wrap" aria-hidden="true">
-          <svg id="eye-icon" class="eye-icon" viewBox="0 0 120 60" xmlns="http://www.w3.org/2000/svg">
-            <path class="eye-outline" d="M2,30 C25,2 95,2 118,30 C95,58 25,58 2,30 Z" />
-            <circle class="eye-iris" cx="60" cy="30" r="14" />
-            <circle class="eye-pupil" cx="60" cy="30" r="5" />
-            <path class="eye-lid" d="M2,30 C25,30 95,30 118,30" />
-          </svg>
+        <div class="eye-wrap face-wrap" id="eye-wrap" aria-hidden="true">
+          <img class="face-img" src="assets/lilith-portrait.png" alt="" />
+          <div class="face-mouth" id="face-mouth"></div>
         </div>
+        <p class="face-caption" id="face-caption" aria-live="polite"></p>
 
         <h1 class="hero-title glitch-text" data-text="Lilith">Lilith</h1>
         <p class="hero-subtitle">Your cosmic companion.</p>
@@ -180,6 +177,7 @@
 <script src="js/lilith-remote.js"></script>
 <script src="js/lilith-brain.js"></script>
 <script src="js/lilith-voice.js"></script>
+<script src="js/lilith-face.js"></script>
 <script src="js/lilith-core.js"></script>
 </body>
 </html>
