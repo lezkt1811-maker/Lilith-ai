@@ -56,7 +56,7 @@ const WorkerAudioProvider = {
             body: JSON.stringify({
                 action: 'speak',
                 text: text,
-                voice: (opts && opts.voiceName) || 'Despina',
+                voice: (opts && opts.voiceName) || 'Sulafat',
                 style: (opts && opts.style) || {}
             })
         })

@@ -20,7 +20,7 @@
     mode: 'default',
     enableVoice: true,
     autoSpeak: true,
-    voiceName: 'Despina',
+    voiceName: 'Sulafat',
     warmth: 50,
     energy: 50,
     pace: 50,

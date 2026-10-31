@@ -27,7 +27,7 @@ const TTS_MODEL = 'gemini-3.1-flash-tts-preview';
 const TTS_ENDPOINT =
   `https://generativelanguage.googleapis.com/v1beta/models/${TTS_MODEL}:generateContent`;
 
-const TTS_VOICE = 'Despina'; // smooth, gentle female voice (free Gemini voice)
+const TTS_VOICE = 'Sulafat'; // warm, easy-to-listen female voice (free Gemini voice)
 const ALLOWED_TTS_VOICES = new Set([
   'Kore', 'Charon', 'Puck', 'Aoede', 'Fenrir', 'Leda', 'Orus',
   'Callirrhoe', 'Autonoe', 'Enceladus', 'Umbriel', 'Algieba',
