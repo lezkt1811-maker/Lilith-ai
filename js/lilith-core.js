@@ -49,12 +49,14 @@
 
   /* ---------------- element refs ---------------- */
   const $ = (sel) => document.querySelector(sel);
+  const each = (sel) => document.querySelectorAll(sel);
   const els = {
     tabs: document.querySelectorAll('.tab-btn'),
     panels: document.querySelectorAll('.tab-panel'),
     statusPill: $('#status-pill'),
     statusText: $('#status-text'),
     awakenBtn: $('#awaken-btn'),
+    restBtn: $('#rest-btn'),
     greetingLine: $('#greeting-line'),
     eyeWrap: $('#eye-wrap'),
     modeSelect: $('#mode-select'),
@@ -121,9 +123,11 @@
     awake = true;
     els.awakenBtn.classList.add('is-awake');
     els.awakenBtn.querySelector('.awaken-btn-label').textContent = 'Return Lilith to Sleep';
+    els.restBtn.textContent = '☾ Let her rest';
     els.statusPill.classList.add('awake');
     els.eyeWrap.classList.add('blinking');
     els.eyeWrap.classList.remove('asleep');
+    each('.face-wrap').forEach((w) => w.classList.remove('asleep'));
 
     const line = LilithBrain.wakeGreeting(settings.wakeGreeting);
     els.greetingLine.textContent = line;
@@ -132,23 +136,60 @@
     updateStatusLabel();
   }
 
-  function goToSleep() {
+  /**
+   * Puts her to rest. With silent=false she says a goodnight line out loud
+   * (used by the Home button). With silent=true she has already said her
+   * goodbye in chat, so nothing more is spoken.
+   */
+  function goToSleep(silent) {
     awake = false;
+    handsFree = false;
+    clearTimeout(listenTimer);
+    if (LilithVoice.isListening()) LilithVoice.stopListening();
+    els.micBtn.classList.remove('listening');
+
     els.awakenBtn.classList.remove('is-awake');
     els.awakenBtn.querySelector('.awaken-btn-label').textContent = 'Awaken Lilith';
+    els.restBtn.textContent = '☀ Wake Lilith';
     els.statusPill.classList.remove('awake', 'speaking');
     els.eyeWrap.classList.remove('blinking');
     els.eyeWrap.classList.add('asleep');
+    each('.face-wrap').forEach((w) => w.classList.add('asleep'));
 
     const line = LilithBrain.sleepGreeting(settings.sleepGreeting);
     els.greetingLine.textContent = line;
-    LilithVoice.stopSpeaking();
     clearTimeout(randomThoughtTimer);
+    if (!silent) {
+      LilithVoice.stopSpeaking();
+      speakIfEnabled(line);
+    }
     updateStatusLabel();
   }
 
+  els.awakenBtn.addEventListener('click', () => {
+    awake ? goToSleep(false) : awaken();
+  });
+
+  /* Wake / Rest button on the Chat screen. Rest is a proper goodnight:
+     she is told, she answers, and then she goes to sleep. */
+  const FAREWELL = "I'm going to rest now. Goodnight, Lilith.";
+  let restAfterReply = false;
+
+  els.restBtn.addEventListener('click', () => {
+    if (!awake) { awaken(); return; }
+    restAfterReply = true;
+    handleUserMessage(FAREWELL);
+  });
+
+  /** Puts her to rest once her goodbye has been said (and spoken, if voice is on). */
+  function finishRest() {
+    if (!restAfterReply) return;
+    restAfterReply = false;
+    goToSleep(true);
+  }
+
   function updateStatusLabel() {
-    if (!awake) { els.statusText.textContent = 'Dormant'; return; }
+    if (!awake) { els.statusText.textContent = 'Resting'; return; }
     if (!LilithRemote.configured()) { els.statusText.textContent = 'Awake · Demo mode'; return; }
     els.statusText.textContent = usingOfflineFallback ? 'Awake · Offline demo' : 'Awake · Connected';
   }
@@ -229,6 +270,7 @@
 
     if (settings.mode === 'silent') {
       addBubble(reply, 'lilith');
+      finishRest();
       return;
     }
 
@@ -236,6 +278,7 @@
     // (before, it waited for the text animation to finish first).
     speakIfEnabled(reply);
     await typeOutBubble(reply);
+    if (!lilithSpeaking) finishRest(); // if her voice already ended or never started
   }
 
   /** Tracks whether we're on the real backend or the offline demo brain, and surfaces it once, clearly. */
@@ -409,8 +452,8 @@
     pauseHandsFree();
 
     LilithVoice.speak(text, {}, {
-      onend: () => { els.statusPill.classList.remove('speaking'); els.waveform.classList.remove('active'); resumeHandsFree(); },
-      onerror: () => { els.statusPill.classList.remove('speaking'); els.waveform.classList.remove('active'); resumeHandsFree(); }
+      onend: () => { els.statusPill.classList.remove('speaking'); els.waveform.classList.remove('active'); resumeHandsFree(); finishRest(); },
+      onerror: () => { els.statusPill.classList.remove('speaking'); els.waveform.classList.remove('active'); resumeHandsFree(); finishRest(); }
     });
   }
 
@@ -589,8 +632,9 @@
     if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) tick();
   })();
 
-  /* initial UI state */
+  /* initial UI state: she starts asleep until you wake her */
   els.eyeWrap.classList.add('asleep');
+  each('.face-wrap').forEach((w) => w.classList.add('asleep'));
   // Memory is fetched from the server only when the Settings tab opens,
   // so page load makes no extra network calls.
   els.memorySummary.textContent = 'Open this tab to see what Lilith remembers.';
