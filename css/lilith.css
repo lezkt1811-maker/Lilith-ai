@@ -662,14 +662,36 @@ input[type="range"] { accent-color: var(--purple); width: 100%; }
 }
 .face-caption.show { opacity: 1; }
 
-/* Smaller copy of the face at the top of the Chat screen */
-.face-wrap.face-small {
-  width: min(42vw, 170px);
-  margin: 0 auto 6px;
+/* Chat screen: Lilith on the left, the conversation on the right */
+.chat-top {
+  display: flex;
+  gap: 10px;
+  flex: 1;
+  min-height: 0;
 }
-.chat-shell > .face-caption {
-  min-height: 2.6em;
-  font-size: 1rem;
-  margin-top: 2px;
+.chat-face-col {
+  flex: 0 0 46%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  min-height: 0;
 }
+.chat-face-col .face-wrap.face-small {
+  width: 100%;
+  margin: 0;
+}
+.chat-face-col .face-caption {
+  min-height: 3.6em;
+  font-size: 0.95rem;
+  margin: 6px 0 0;
+}
+.chat-top > .chat-window {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* Keep the send button on screen: the text box shrinks instead of pushing it off */
+.chat-input-row #chat-input { flex: 1 1 0; min-width: 0; width: 100%; }
+.chat-input-row { max-width: 100%; box-sizing: border-box; }
 

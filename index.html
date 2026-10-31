@@ -77,16 +77,21 @@
     <!-- ============ CHAT TAB ============ -->
     <section id="tab-chat" class="tab-panel active" role="tabpanel">
       <div class="chat-shell">
-        <!-- Her picture on the Chat screen too, so you see her while you talk -->
-        <div class="face-wrap face-small" aria-hidden="true">
-          <img class="face-img" src="assets/lilith-portrait.png" alt="" />
-          <div class="face-mouth"></div>
-        </div>
-        <p class="face-caption"></p>
-        <div class="chat-window" id="chat-window">
-          <div class="chat-messages" id="chat-messages"></div>
-          <div class="typing-indicator" id="typing-indicator" hidden>
-            <span></span><span></span><span></span>
+        <div class="chat-top">
+          <!-- Left: her picture, with her words under it -->
+          <div class="chat-face-col">
+          <div class="face-wrap face-small" aria-hidden="true">
+            <img class="face-img" src="assets/lilith-portrait.png" alt="" />
+            <div class="face-mouth"></div>
+          </div>
+          <p class="face-caption"></p>
+          </div>
+          <!-- Right: the conversation -->
+          <div class="chat-window" id="chat-window">
+            <div class="chat-messages" id="chat-messages"></div>
+            <div class="typing-indicator" id="typing-indicator" hidden>
+              <span></span><span></span><span></span>
+            </div>
           </div>
         </div>
 
