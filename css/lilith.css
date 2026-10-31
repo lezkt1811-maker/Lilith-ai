@@ -709,3 +709,14 @@ input[type="range"] { accent-color: var(--purple); width: 100%; }
   min-height: 44px;
 }
 
+/* Mouth frames: 10 pictures of her lips, from closed to open, placed on the lips of the face picture.
+   Positions are fractions of the full picture (1024 x 1536), so they stay on the lips at any size. */
+.face-mouth-img {
+  position: absolute;
+  left: 31.25%;
+  top: 33.85%;
+  width: 11.72%;
+  height: auto;
+  pointer-events: none;
+}
+

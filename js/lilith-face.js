@@ -16,6 +16,8 @@
   // There is one face on Home and one on Chat. Every copy moves together.
   const each = (sel) => document.querySelectorAll(sel);
 
+  const MOUTH_FRAMES = 10;      // assets/mouth/mouth-0.png (closed) .. mouth-9.png (open)
+  let lastMouthFrame = -1;
   const SECONDS_PER_WORD = 0.36; // reading pace used when there is no voice audio
   const MIN_SECONDS = 1.8;
 
@@ -54,6 +56,14 @@
     }
   }
 
+  /** Swaps the mouth picture to match how open her mouth should be (0 = closed, 1 = fully open). */
+  function setMouth(open) {
+    const idx = Math.max(0, Math.min(MOUTH_FRAMES - 1, Math.round(open * (MOUTH_FRAMES - 1))));
+    if (idx === lastMouthFrame) return;
+    lastMouthFrame = idx;
+    each('.face-mouth-img').forEach((m) => { m.src = 'assets/mouth/mouth-' + idx + '.png'; });
+  }
+
   function setCaption(text, visible) {
     each('.face-caption').forEach((c) => {
       c.textContent = text;
@@ -86,14 +96,14 @@
     }
 
     const open = Math.max(0, Math.min(1, level));
-    each('.face-mouth').forEach((m) => { m.style.height = (open * 4.5).toFixed(2) + '%'; });
+    setMouth(open);
 
     const shown = Math.min(words.length, Math.max(1, Math.floor(progress * words.length) + 1));
     setCaption(words.slice(0, shown).join(' '), true);
 
     if (!activeAudio && progress >= 1) {
       // Timed reading finished: close the mouth and keep the full text on screen.
-      each('.face-mouth').forEach((m) => { m.style.height = '0%'; });
+      setMouth(0);
       cancelAnimationFrame(rafId);
       rafId = null;
       talking = false;
@@ -131,7 +141,7 @@
     activeAudio = null;
     analyser = null;
     talking = false;
-    each('.face-mouth').forEach((m) => { m.style.height = '0%'; });
+    setMouth(0);
     each('.face-wrap').forEach((w) => w.classList.remove('speaking'));
     each('.face-caption').forEach((c) => { c.textContent = ''; c.classList.remove('show'); });
   }
