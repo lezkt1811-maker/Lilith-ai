@@ -232,8 +232,10 @@
       return;
     }
 
-    await typeOutBubble(reply);
+    // Ask for her voice right away, so it's ready as the words appear
+    // (before, it waited for the text animation to finish first).
     speakIfEnabled(reply);
+    await typeOutBubble(reply);
   }
 
   /** Tracks whether we're on the real backend or the offline demo brain, and surfaces it once, clearly. */
