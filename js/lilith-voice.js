@@ -14,11 +14,42 @@
 (function (global) {
 'use strict';
 
+/* The one clip that is playing or loading right now. Stop and Mute cancel it. */
+let currentAudio = null;
+let currentRequest = 0; // bumped on every speak/stop, so a late reply never plays over newer speech
+
+function stopCurrentAudio() {
+    currentRequest++;
+    if (currentAudio) {
+        currentAudio.onended = null;
+        currentAudio.onerror = null;
+        currentAudio.pause();
+        if (currentAudio.src && currentAudio.src.startsWith('blob:')) URL.revokeObjectURL(currentAudio.src);
+        currentAudio = null;
+    }
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+}
+
+/** Fallback when the Worker voice is unavailable: the browser's own voice. */
+function browserSpeak(text, opts, callbacks, requestId) {
+    if (!('speechSynthesis' in window)) {
+        if (callbacks && callbacks.onend) callbacks.onend();
+        return;
+    }
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 0.95;
+    utterance.pitch = 1.0;
+    utterance.onend = () => { if (requestId === currentRequest && callbacks && callbacks.onend) callbacks.onend(); };
+    utterance.onerror = () => { if (callbacks && callbacks.onend) callbacks.onend(); };
+    window.speechSynthesis.speak(utterance);
+}
+
 const WorkerAudioProvider = {
     speak(text, opts, callbacks) {
+        stopCurrentAudio();
+        const requestId = currentRequest;
         if (callbacks && callbacks.onstart) callbacks.onstart();
 
-        // Calls your worker endpoint for custom audio generation
         fetch(global.LILITH_CONFIG.WORKER_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -31,36 +62,35 @@ const WorkerAudioProvider = {
         })
         .then(res => res.json())
         .then(data => {
-            if (data && data.audio) {
-                const pcmBytes = Uint8Array.from(atob(data.audio), c => c.charCodeAt(0));
-                const wavBytes = pcmToWav(
-                    pcmBytes,
-                    data.sampleRate || 24000,
-                    data.channels || 1,
-                    data.bitsPerSample || 16
-                );
-                const blob = new Blob([wavBytes], { type: 'audio/wav' });
-                const audio = new Audio(URL.createObjectURL(blob));
-                if (callbacks && callbacks.onend) audio.onended = callbacks.onend;
-                audio.onerror = (e) => {
-                    console.error('Lilith voice: audio playback failed', e);
-                    if (callbacks && callbacks.onend) callbacks.onend();
-                };
-                audio.play().catch(err => {
-                    console.error('Lilith voice: audio.play() rejected', err);
-                    if (callbacks && callbacks.onend) callbacks.onend();
-                });
-            } else {
-                console.error('Lilith voice: worker response had no audio field', data);
+            if (requestId !== currentRequest) return; // stopped or superseded while loading
+            if (!data || !data.audio) throw new Error(data && data.message ? data.message : 'no audio field');
+
+            const mime = data.mimeType || 'audio/wav';
+            const bytes = Uint8Array.from(atob(data.audio), c => c.charCodeAt(0));
+            const fileBytes = data.mimeType
+                ? bytes // already a playable file (MP3 from ElevenLabs)
+                : pcmToWav(bytes, data.sampleRate || 24000, data.channels || 1, data.bitsPerSample || 16);
+            const url = URL.createObjectURL(new Blob([fileBytes], { type: mime }));
+
+            const audio = new Audio(url);
+            currentAudio = audio;
+            audio.onended = () => {
+                URL.revokeObjectURL(url);
+                if (currentAudio === audio) currentAudio = null;
                 if (callbacks && callbacks.onend) callbacks.onend();
-            }
+            };
+            audio.onerror = () => {
+                if (callbacks && callbacks.onend) callbacks.onend();
+            };
+            return audio.play();
         })
         .catch(err => {
-            console.error('Audio stream error:', err);
-            if (callbacks && callbacks.onend) callbacks.onend();
+            if (requestId !== currentRequest) return;
+            console.error('Lilith voice: Worker voice failed, using browser voice instead', err);
+            browserSpeak(text, opts, callbacks, requestId);
         });
     },
-    stop() {}
+    stop() { stopCurrentAudio(); }
 };
 
 /**

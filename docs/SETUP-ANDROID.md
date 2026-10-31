@@ -27,7 +27,7 @@ Nothing else changes. Your GitHub Pages site stays exactly where it is.
 3. Choose **Create API key** — pick "Create API key in new project" if asked.
 4. Copy the key somewhere safe temporarily (like your phone's Notes app) — you'll paste it once into Cloudflare and then never need to expose it again.
 
-**No billing, no credit card, nothing to set up here.** New Google AI Studio accounts start on the **Free Tier** automatically. This project uses `gemini-2.5-flash`, a model that's free on this tier with no billing account attached — you will not be asked to add a card for any of this.
+**No billing, no credit card, nothing to set up here.** New Google AI Studio accounts start on the **Free Tier** automatically. This project uses `gemini-flash-lite-latest` for chat, a model that's free on this tier with no billing account attached — you will not be asked to add a card for any of this.
 
 ### Understanding the free tier's real limit
 Unlike a paid API, there's no "surprise bill" risk here — the free tier is capped by **quota** (a limited number of requests per minute and per day), not by spend. If you ever use it up, Gemini returns a "quota exceeded" response, the Worker catches it, and Lilith automatically drops to her offline demo mode until the quota resets — she'll never charge you anything or fail silently.
@@ -98,3 +98,23 @@ At this point, your key exists in exactly one place: Cloudflare's encrypted secr
 - **"Gemini API error"** → usually means the API key itself is invalid or was revoked — generate a new one in Google AI Studio and update the Cloudflare secret.
 
 Nothing here can expose your key through the frontend — the worst-case failure mode is Lilith politely dropping to offline demo mode, never a leaked secret, and never a bill.
+
+---
+
+## Part D — Optional upgrades (all off until you add them)
+
+Nothing here is required. Lilith works without any of it.
+
+**Memory** needs no setup. The Worker's KV namespace is already declared in `wrangler.jsonc` (binding `LILITH_MEMORY`). Settings → Memory shows what she remembers.
+
+**Auto-deploy from GitHub** (optional). Pushing to `main` runs `.github/workflows/deploy.yml`, which needs two repository secrets (GitHub → Settings → Secrets and variables → Actions):
+- `CLOUDFLARE_API_TOKEN` — a Cloudflare API token with "Edit Cloudflare Workers" permission
+- `CLOUDFLARE_ACCOUNT_ID` — your account ID from the Cloudflare dashboard
+
+**Better voice (ElevenLabs)** (optional). In Cloudflare → Settings → Variables and Secrets, add:
+- `ELEVENLABS_API_KEY` (secret) and `ELEVENLABS_VOICE_ID` (the voice you want from ElevenLabs' voice library)
+
+When both are set, Lilith speaks with ElevenLabs. If it fails, she falls back to Gemini, then to the browser's voice.
+
+**Higher NASA limit** (optional). `NASA_API_KEY` as a secret. Without it, the app uses NASA's public `DEMO_KEY`, which works but is rate-limited.
+

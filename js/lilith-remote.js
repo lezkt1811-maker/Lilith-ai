@@ -13,18 +13,33 @@
   'use strict';
 
   const TIMEOUT_MS = 20000;
+  const MEMORY_ID_KEY = 'lilith_memory_id_v1';
 
   function configured() {
     return !!(global.LILITH_CONFIG && global.LILITH_CONFIG.WORKER_URL && global.LILITH_CONFIG.WORKER_URL.trim());
   }
 
   /**
-   * @param {string} message - the user's new message
-   * @param {Array<{role:'user'|'assistant', content:string}>} history - recent turns only (already trimmed by caller)
-   * @returns {Promise<string>} the reply text
-   * @throws {Error} with a .code on failure, so callers can show a specific message
+   * A random ID for this browser. The Worker uses it to find this browser's
+   * stored memory. It is not a login: anyone who has it can read that memory,
+   * so it is never shown on screen or sent anywhere else.
    */
-  async function sendMessage(message, history) {
+  function memoryId() {
+    try {
+      let id = localStorage.getItem(MEMORY_ID_KEY);
+      if (!id || id.length < 16) {
+        const bytes = new Uint8Array(16);
+        crypto.getRandomValues(bytes);
+        id = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+        localStorage.setItem(MEMORY_ID_KEY, id);
+      }
+      return id;
+    } catch (e) {
+      return null; // storage blocked: the Worker falls back to session-only history
+    }
+  }
+
+  async function postWorker(payload) {
     if (!configured()) {
       const err = new Error('Lilith is not connected to a Worker yet — WORKER_URL is empty in lilith-config.js.');
       err.code = 'not_configured';
@@ -39,7 +54,7 @@
       res = await fetch(global.LILITH_CONFIG.WORKER_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message, history }),
+        body: JSON.stringify(payload),
         signal: controller.signal,
       });
     } catch (e) {
@@ -66,16 +81,39 @@
       err.code = data.error || 'unknown_error';
       throw err;
     }
+    return data;
+  }
 
+  /**
+   * @param {string} message - the user's new message
+   * @param {Array<{role:'user'|'assistant', content:string}>} history - session turns, used only if memory is unavailable
+   * @returns {Promise<string>} the reply text
+   * @throws {Error} with a .code on failure, so callers can show a specific message
+   */
+  async function sendMessage(message, history) {
+    const data = await postWorker({ message, history, memoryId: memoryId() });
     if (!data.reply) {
       const err = new Error('The backend responded with no reply text.');
       err.code = 'empty_reply';
       throw err;
     }
-
     return data.reply;
   }
 
-  global.LilithRemote = { sendMessage, configured };
+  /** @returns {Promise<{summary:string, exchanges:number}>} what Lilith remembers on the server */
+  async function getMemory() {
+    const id = memoryId();
+    if (!id) throw Object.assign(new Error('Browser storage is blocked.'), { code: 'no_storage' });
+    return postWorker({ action: 'memory', memoryId: id });
+  }
+
+  /** Deletes this browser's server-side memory. */
+  async function forgetMemory() {
+    const id = memoryId();
+    if (!id) return;
+    await postWorker({ action: 'forget', memoryId: id });
+  }
+
+  global.LilithRemote = { sendMessage, getMemory, forgetMemory, configured };
 
 })(window);

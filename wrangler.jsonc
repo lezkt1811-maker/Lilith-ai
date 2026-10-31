@@ -13,5 +13,13 @@
 {
   "name": "lilith-worker",
   "main": "worker/lilith-worker.js",
-  "compatibility_date": "2026-07-01"
+  "compatibility_date": "2026-07-01",
+  // Persistent memory: Lilith's conversation memory lives in this KV namespace.
+  // The id is not a secret; it only points at the namespace in your account.
+  "kv_namespaces": [
+    {
+      "binding": "LILITH_MEMORY",
+      "id": "e2a730e8e6484d10bfe191df6cd43360"
+    }
+  ]
 }

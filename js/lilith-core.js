@@ -262,6 +262,9 @@
       case 'gemini_error': return 'Gemini API error';
       case 'quota_exceeded': return 'free quota exhausted';
       case 'blocked_response': return 'response blocked by safety filter';
+      case 'memory_unavailable': return 'server memory not set up yet';
+      case 'bad_memory_id': return 'browser memory ID is invalid';
+      case 'no_storage': return 'browser storage is blocked';
       default: return code || 'unknown error';
     }
   }
@@ -459,14 +462,36 @@
   els.sleepGreetingInput.value = settings.sleepGreeting;
   els.sleepGreetingInput.addEventListener('input', () => { settings.sleepGreeting = els.sleepGreetingInput.value; saveSettings(); });
 
-  els.clearMemoryBtn.addEventListener('click', () => {
+  els.clearMemoryBtn.addEventListener('click', async () => {
     LilithBrain.memory.clear();
+    sessionHistory.length = 0;
+    try {
+      await LilithRemote.forgetMemory();
+      addBubble("Done. A clean slate — for now.", 'lilith');
+    } catch (err) {
+      addBubble(`I couldn't clear my memory on the server (${humanizeErrorCode(err.code)}). Local memory is cleared.`, 'ambient');
+    }
     refreshMemorySummary();
-    addBubble("Done. A clean slate — for now.", 'lilith');
   });
 
-  function refreshMemorySummary() {
-    els.memorySummary.textContent = LilithBrain.memory.summaryText();
+  async function refreshMemorySummary() {
+    const local = LilithBrain.memory.summaryText();
+    if (!LilithRemote.configured()) {
+      els.memorySummary.textContent = local;
+      return;
+    }
+    els.memorySummary.textContent = 'Checking what I remember…';
+    try {
+      const mem = await LilithRemote.getMemory();
+      const count = mem.exchanges || 0;
+      const head = mem.summary
+        ? mem.summary
+        : 'Nothing summarized yet.';
+      els.memorySummary.textContent =
+        `${head} (${count} recent exchange${count === 1 ? '' : 's'} kept.)`;
+    } catch (err) {
+      els.memorySummary.textContent = `Couldn't reach my memory right now (${humanizeErrorCode(err.code)}). ${local}`;
+    }
   }
 
   // restore active mode chip on load

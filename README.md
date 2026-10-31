@@ -10,15 +10,19 @@ This is currently a **standalone project**, not wired into StarChart13. It's str
 Browser (GitHub Pages, public, no secrets)
         │  POST { message, history }
         ▼
-Cloudflare Worker (holds the API key as an encrypted secret)
+Cloudflare Worker (holds the API key as an encrypted secret; KV for memory)
         │
         ▼
-Gemini API (gemini-2.5-flash)
+Gemini API (gemini-flash-lite-latest for chat, gemini-3.1-flash-tts-preview for voice)
 ```
 
 The persona system prompt (`docs/lilith-persona.md`, Section 9) lives inside the Worker (`worker/lilith-worker.js`) — it's sent with every request but kept separate from project-specific context, so either can change independently.
 
-**No persistent memory yet.** Conversation history exists only in the browser tab for the current session (capped to the last ~6 exchanges) and resets on reload. If the Worker is unreachable, the app automatically falls back to a local, keyword-matched offline demo brain and shows a clear "Offline demo" status — it never silently pretends to be the real thing.
+**Persistent memory.** Lilith remembers people across sessions. Each browser gets a random memory ID; the Worker stores the most recent ~10 exchanges verbatim in Cloudflare KV (binding `LILITH_MEMORY`), and folds older ones into a rolling summary using Gemini. The summary is injected into her instructions on every request. Settings → Memory shows what she remembers, and "Forget everything" wipes it on the server. If the Worker is unreachable, the app falls back to the offline demo brain and shows a clear "Offline demo" status — it never silently pretends to be the real thing.
+
+**Live sky.** The Worker computes the current Moon phase and fetches NASA's astronomy picture of the day (cached for 6 hours), and gives both to Lilith as context.
+
+**Voice.** Gemini TTS is the default voice. If you set `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID` on the Worker, ElevenLabs is used instead. If the Worker voice fails, the browser's own voice takes over.
 
 ## Setup
 
@@ -40,14 +44,14 @@ npx serve .
 - `js/lilith-config.js` — the one file you edit: your Worker's URL (no secrets)
 - `js/lilith-remote.js` — calls the Worker, handles timeouts/errors
 - `js/lilith-brain.js` — offline fallback: personality, StarChart13 knowledge base, local memory, random-thought bank
-- `js/lilith-voice.js` — speech synthesis (voice/rate/pitch/volume) + optional mic input via the Web Speech API
+- `js/lilith-voice.js` — Worker voice (Gemini or ElevenLabs), browser-voice fallback, stop/mute, optional mic input via the Web Speech API
 - `js/lilith-core.js` — UI wiring, connection-state handling, ambient random-thought scheduler, settings persistence, particle background
 - `worker/lilith-worker.js` — deploy this to Cloudflare; holds the persona system prompt and calls the Gemini API using your secret key
 - `docs/lilith-persona.md` — the full character design document
 - `docs/SETUP-ANDROID.md` — step-by-step setup guide
 
 ## Current capabilities
-- Real Gemini-powered chat (once connected) with typing animation, auto-scroll, session conversation continuity
+- Real Gemini-powered chat with typing animation, auto-scroll, and persistent memory across sessions
 - Offline demo brain as automatic fallback, with clear status indication
 - Voice replies: voice picker, speed/pitch/volume sliders, mute, stop; optional mic input where supported
 - Personality modes: Lilith (default), Astronomer, Storyteller, Teacher, Chaos, Silent
@@ -56,9 +60,9 @@ npx serve .
 - Mobile-first
 
 ## Free-tier / quota controls (built into the Worker)
-- Uses `gemini-2.5-flash`, a stable model with genuinely free API access (confirmed against Google's official pricing docs) — no billing account needed
+- Uses `gemini-flash-lite-latest` for chat and the summary step, and `gemini-3.1-flash-tts-preview` for the default voice — both available on the free tier with no billing account
 - The free tier is quota-based, not spend-based: there's no dollar cost to overrun, only a request quota that can be temporarily exhausted
-- Caps reply length (400 tokens) and conversation history (last ~6 exchanges) sent per request, to stay comfortably within quota
+- Caps reply length and the number of recent turns sent per request, to stay comfortably within quota
 - Returns a clear `quota_exceeded` error if the free tier's limit is hit, so the frontend can fall back to offline demo mode instead of failing silently
 - Rejects oversized messages before they reach the API
 
