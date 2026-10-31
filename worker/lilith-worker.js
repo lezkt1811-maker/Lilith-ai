@@ -188,7 +188,7 @@ a book, an app) that you don't have details on, say so plainly rather than
 guessing — this slot is where that context will be added later.`;
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const allowedOrigin = env.ALLOWED_ORIGIN || '*';
 
     const corsHeaders = {
@@ -256,11 +256,11 @@ export default {
     // ---------------------------------------------------------------
     // NORMAL CHAT REQUEST
     // ---------------------------------------------------------------
-    return handleChatRequest(body, env, corsHeaders);
+    return handleChatRequest(body, env, corsHeaders, ctx);
   },
 };
 
-async function handleChatRequest(body, env, corsHeaders) {
+async function handleChatRequest(body, env, corsHeaders, ctx) {
   const message = (body.message || '').toString();
   const history = Array.isArray(body.history) ? body.history : [];
 
@@ -291,7 +291,11 @@ async function handleChatRequest(body, env, corsHeaders) {
   // the history the browser sends, as before.
   const memoryId = typeof body.memoryId === 'string' ? body.memoryId : '';
   const useMemory = MEMORY_ID_PATTERN.test(memoryId) && !!env.LILITH_MEMORY;
-  const memory = useMemory ? await loadMemory(env, memoryId) : null;
+  // Load memory and sky data at the same time, instead of one after the other.
+  const [memory, sky] = await Promise.all([
+    useMemory ? loadMemory(env, memoryId) : Promise.resolve(null),
+    skyContext(env),
+  ]);
 
   const sourceHistory = memory ? memory.turns : history;
   const trimmedHistory = sourceHistory
@@ -332,8 +336,6 @@ async function handleChatRequest(body, env, corsHeaders) {
       }`
     : '';
 
-  const sky = await skyContext(env);
-
   try {
     const geminiResponse = await fetch(GEMINI_ENDPOINT, {
       method: 'POST',
@@ -362,6 +364,8 @@ async function handleChatRequest(body, env, corsHeaders) {
           temperature: 0.9,
         },
       }),
+      // Give up before the app's own 20-second timeout, so the error is clear.
+      signal: AbortSignal.timeout(18000),
     });
 
     if (geminiResponse.status === 429) {
@@ -433,7 +437,11 @@ async function handleChatRequest(body, env, corsHeaders) {
     }
 
     if (memory) {
-      await rememberExchange(env, memoryId, memory, message, reply);
+      // Save after the reply is sent, so the person doesn't wait on the write
+      // (or on a summary update). Falls back to awaiting if ctx is unavailable.
+      const saving = rememberExchange(env, memoryId, memory, message, reply);
+      if (ctx && typeof ctx.waitUntil === 'function') ctx.waitUntil(saving);
+      else await saving;
     }
 
     return json(

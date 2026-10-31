@@ -11,7 +11,7 @@
 // on purpose.
 // ------------------------------------------------------------------
 {
-  "name": "lilith-worker",
+  "name": "lilith-ai",
   "main": "worker/lilith-worker.js",
   "compatibility_date": "2026-07-01",
   // Persistent memory: Lilith's conversation memory lives in this KV namespace.

@@ -164,7 +164,8 @@
   /* =========================================================
    * CHAT
    * ========================================================= */
-  const sessionHistory = []; // in-memory only; resets on reload. Not persistent memory.
+  const CONTENT_ERROR_CODES = new Set(['message_too_long', 'empty_message', 'blocked_response', 'empty_reply']);
+  const sessionHistory = []; // this tab's recent turns; the server keeps the long-term memory.
   const MAX_SESSION_HISTORY = 12; // ~6 exchanges, mirrors the Worker's own cap
   let usingOfflineFallback = false;
   let offlineNoticeShown = false;
@@ -207,6 +208,14 @@
         reply = await LilithRemote.sendMessage(text, sessionHistory.slice(-MAX_SESSION_HISTORY), settings.mode);
         setConnectionState(true);
       } catch (err) {
+        // Content problems (too long, blocked, empty) are not outages: show them
+        // as Lilith's words and stay connected. Only real connection failures
+        // should switch to offline demo mode.
+        if (CONTENT_ERROR_CODES.has(err.code)) {
+          els.typingIndicator.hidden = true;
+          addBubble(err.message, 'ambient');
+          return;
+        }
         setConnectionState(false, err);
         source = 'offline';
       }
@@ -546,7 +555,9 @@
 
   /* initial UI state */
   els.eyeWrap.classList.add('asleep');
-  refreshMemorySummary();
+  // Memory is fetched from the server only when the Settings tab opens,
+  // so page load makes no extra network calls.
+  els.memorySummary.textContent = 'Open this tab to see what Lilith remembers.';
 
   /* =========================================================
    * EXTENSION POINTS
