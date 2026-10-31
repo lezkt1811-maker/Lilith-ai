@@ -100,7 +100,11 @@ function speak(text, opts = {}, callbacks = {}) {
     .catch(err => {
         // Voice is optional: if it fails, the text is still in the chat.
         console.error('Lilith voice: could not play speech', err);
-        if (requestId === currentRequest && callbacks.onend) callbacks.onend();
+        if (requestId === currentRequest) {
+            // Tell the page why, so a missing voice is never silent.
+            window.dispatchEvent(new CustomEvent('lilith-voice-error', { detail: (err && err.message) || 'unknown error' }));
+            if (callbacks.onend) callbacks.onend();
+        }
     });
 }
 

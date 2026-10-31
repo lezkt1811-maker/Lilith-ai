@@ -315,6 +315,14 @@
     }
   }
 
+  // Shows why her voice didn't play, at most once a minute, so it isn't silent.
+  let lastVoiceNoticeAt = 0;
+  window.addEventListener('lilith-voice-error', (e) => {
+    if (Date.now() - lastVoiceNoticeAt < 60000) return;
+    lastVoiceNoticeAt = Date.now();
+    addBubble(`Her voice didn't play: ${e.detail}`, 'ambient');
+  });
+
   function typeOutBubble(fullText) {
     return new Promise((resolve) => {
       const bubble = addBubble('', 'lilith');
