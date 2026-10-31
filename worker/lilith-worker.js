@@ -27,12 +27,8 @@ const TTS_MODEL = 'gemini-3.1-flash-tts-preview';
 const TTS_ENDPOINT =
   `https://generativelanguage.googleapis.com/v1beta/models/${TTS_MODEL}:generateContent`;
 
-const TTS_VOICE = 'Sulafat'; // warm, easy-to-listen female voice (free Gemini voice)
-const ALLOWED_TTS_VOICES = new Set([
-  'Kore', 'Charon', 'Puck', 'Aoede', 'Fenrir', 'Leda', 'Orus',
-  'Callirrhoe', 'Autonoe', 'Enceladus', 'Umbriel', 'Algieba',
-  'Despina', 'Gacrux', 'Sulafat', 'Vindemiatrix', 'Zephyr',
-]);
+// The one voice Lilith speaks with: Gemini's "Sulafat" (warm, free).
+const TTS_VOICE = 'Sulafat';
 const TTS_SAMPLE_RATE = 24000;
 const TTS_CHANNELS = 1;
 const TTS_BITS_PER_SAMPLE = 16;
@@ -491,38 +487,6 @@ async function handleSpeechRequest(body, env, corsHeaders) {
     );
   }
 
-  const requestedVoice = (body.voice || '').toString().trim();
-  const chosenVoice = ALLOWED_TTS_VOICES.has(requestedVoice) ? requestedVoice : TTS_VOICE;
-
-  const style = body.style || {};
-  const warmth = clampPercent(style.warmth, 50);
-  const energy = clampPercent(style.energy, 50);
-  const pace = clampPercent(style.pace, 50);
-
-  const warmthNote =
-    warmth < 30 ? 'Cool and reserved rather than warm.' :
-    warmth > 70 ? 'Noticeably warm and emotionally present.' :
-    'Warm, but not overly sweet.';
-
-  const energyNote =
-    energy < 30 ? 'Calm, low-key energy. Understated, never flat or bored.' :
-    energy > 70 ? 'Lively and animated, with real energy behind the words.' :
-    'Steady, natural energy — engaged but not hyped.';
-
-  const paceNote =
-    pace < 30 ? 'Slow and deliberate. Let words breathe, use longer pauses.' :
-    pace > 70 ? 'Brisk and efficient, minimal pausing, keeps moving.' :
-    'Unhurried and natural. Use gentle pauses where the meaning calls for them. Do not drag words or speak painfully slowly.';
-
-  // Optional higher-quality voice (ElevenLabs). Used only when both secrets
-  // are set; any failure falls through to Gemini voice below.
-  if (env.ELEVENLABS_API_KEY && env.ELEVENLABS_VOICE_ID) {
-    const eleven = await speakWithElevenLabs(speechText, { warmth, energy }, env);
-    if (eleven) {
-      return json({ audio: eleven, mimeType: 'audio/mpeg' }, 200, corsHeaders);
-    }
-  }
-
   const voicePrompt = `# AUDIO PROFILE: Lilith
 
 A mature feminine voice with a low, warm register.
@@ -534,14 +498,15 @@ cartoonish, robotic, theatrical, or like a navigation system.
 # DIRECTOR'S NOTES
 
 Tone:
-Quiet authority. ${warmthNote} Emotionally present without performing
-emotion.
+Quiet authority. Warm, but not overly sweet. Emotionally present without
+performing emotion.
 
 Energy:
-${energyNote}
+Steady, natural energy: engaged but not hyped.
 
 Pace:
-${paceNote}
+Unhurried and natural. Use gentle pauses where the meaning calls for them.
+Do not drag words or speak painfully slowly.
 
 Delivery:
 Clear American English. Direct and conversational. Dry humor may appear
@@ -577,7 +542,7 @@ ${speechText}`;
           speechConfig: {
             voiceConfig: {
               prebuiltVoiceConfig: {
-                voiceName: chosenVoice,
+                voiceName: TTS_VOICE,
               },
             },
           },
@@ -846,60 +811,6 @@ async function skyContext(env) {
   }
 
   return text + ' Mention this only when it is relevant to the conversation. Do not recite it.';
-}
-
-/* =====================================================================
- * OPTIONAL ELEVENLABS VOICE
- * ===================================================================== */
-async function speakWithElevenLabs(text, style, env) {
-  try {
-    const res = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(env.ELEVENLABS_VOICE_ID)}?output_format=mp3_44100_128`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'audio/mpeg',
-          'xi-api-key': env.ELEVENLABS_API_KEY,
-        },
-        body: JSON.stringify({
-          text,
-          model_id: 'eleven_multilingual_v2',
-          voice_settings: {
-            stability: 0.55,
-            similarity_boost: 0.75,
-            style: (style.warmth / 100) * 0.4,
-            use_speaker_boost: true,
-          },
-        }),
-        signal: AbortSignal.timeout(15000),
-      }
-    );
-    if (!res.ok) {
-      console.error('ElevenLabs error', res.status);
-      return null;
-    }
-    return arrayBufferToBase64(await res.arrayBuffer());
-  } catch (error) {
-    console.error('ElevenLabs fetch failed', String(error).slice(0, 200));
-    return null;
-  }
-}
-
-function arrayBufferToBase64(buffer) {
-  const bytes = new Uint8Array(buffer);
-  let binary = '';
-  const CHUNK = 0x8000;
-  for (let i = 0; i < bytes.length; i += CHUNK) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
-  }
-  return btoa(binary);
-}
-
-function clampPercent(value, fallback) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return fallback;
-  return Math.min(100, Math.max(0, n));
 }
 
 function json(payload, status = 200, extraHeaders = {}) {

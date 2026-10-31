@@ -1,14 +1,13 @@
 /**
- * * lilith-voice.js
- * *
- * Voice layer. Wraps the browser's SpeechSynthesis (text-to-speech)
- * and, where available, SpeechRecognition (speech-to-text) behind a
- * small provider interface so a higher-quality voice (e.g.
- * ElevenLabs) can be dropped in without touching lilith-core.js.
- * *
- * FUTURE EXPANSION HOOK:
- * * LilithVoice.setSpeechProvider({ speak(text, opts), stop() })
- * * to replace BrowserTTSProvider with e.g. an ElevenLabs client.
+ * lilith-voice.js
+ * ------------------------------------------------------------------
+ * Lilith's voice. One voice, one path: the Worker generates speech with
+ * Gemini (the "Sulafat" voice) and this file plays it. Stop and Mute
+ * cancel whatever is playing.
+ *
+ * Also holds the optional mic input (browser speech recognition), where
+ * the browser supports it.
+ * ------------------------------------------------------------------
  */
 
 (function (global) {
@@ -27,76 +26,11 @@ function stopCurrentAudio() {
         if (currentAudio.src && currentAudio.src.startsWith('blob:')) URL.revokeObjectURL(currentAudio.src);
         currentAudio = null;
     }
-    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
 }
-
-/** Fallback when the Worker voice is unavailable: the browser's own voice. */
-function browserSpeak(text, opts, callbacks, requestId) {
-    if (!('speechSynthesis' in window)) {
-        if (callbacks && callbacks.onend) callbacks.onend();
-        return;
-    }
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 0.95;
-    utterance.pitch = 1.0;
-    utterance.onend = () => { if (requestId === currentRequest && callbacks && callbacks.onend) callbacks.onend(); };
-    utterance.onerror = () => { if (callbacks && callbacks.onend) callbacks.onend(); };
-    window.speechSynthesis.speak(utterance);
-}
-
-const WorkerAudioProvider = {
-    speak(text, opts, callbacks) {
-        stopCurrentAudio();
-        const requestId = currentRequest;
-        if (callbacks && callbacks.onstart) callbacks.onstart();
-
-        fetch(global.LILITH_CONFIG.WORKER_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                action: 'speak',
-                text: text,
-                voice: (opts && opts.voiceName) || 'Sulafat',
-                style: (opts && opts.style) || {}
-            })
-        })
-        .then(res => res.json())
-        .then(data => {
-            if (requestId !== currentRequest) return; // stopped or superseded while loading
-            if (!data || !data.audio) throw new Error(data && data.message ? data.message : 'no audio field');
-
-            const mime = data.mimeType || 'audio/wav';
-            const bytes = Uint8Array.from(atob(data.audio), c => c.charCodeAt(0));
-            const fileBytes = data.mimeType
-                ? bytes // already a playable file (MP3 from ElevenLabs)
-                : pcmToWav(bytes, data.sampleRate || 24000, data.channels || 1, data.bitsPerSample || 16);
-            const url = URL.createObjectURL(new Blob([fileBytes], { type: mime }));
-
-            const audio = new Audio(url);
-            currentAudio = audio;
-            audio.onended = () => {
-                URL.revokeObjectURL(url);
-                if (currentAudio === audio) currentAudio = null;
-                if (callbacks && callbacks.onend) callbacks.onend();
-            };
-            audio.onerror = () => {
-                if (callbacks && callbacks.onend) callbacks.onend();
-            };
-            return audio.play();
-        })
-        .catch(err => {
-            if (requestId !== currentRequest) return;
-            console.error('Lilith voice: Worker voice failed, using browser voice instead', err);
-            browserSpeak(text, opts, callbacks, requestId);
-        });
-    },
-    stop() { stopCurrentAudio(); }
-};
 
 /**
- * Wraps raw PCM samples (what Gemini TTS actually returns) in a
- * standard 44-byte RIFF/WAV header so browsers can decode and play it.
- * Without this header, browsers silently refuse to play the audio.
+ * Wraps raw PCM samples (what Gemini TTS returns) in a standard 44-byte
+ * RIFF/WAV header so browsers can decode and play it.
  */
 function pcmToWav(pcmBytes, sampleRate, numChannels, bitsPerSample) {
     const blockAlign = numChannels * (bitsPerSample / 8);
@@ -128,19 +62,46 @@ function pcmToWav(pcmBytes, sampleRate, numChannels, bitsPerSample) {
     return wavBytes;
 }
 
-let activeProvider = WorkerAudioProvider;
-function setSpeechProvider(provider) { activeProvider = provider; }
-
-function getVoices() {
-    return [];
-}
-
+/** Asks the Worker for speech and plays it. */
 function speak(text, opts = {}, callbacks = {}) {
-    return activeProvider.speak(text, opts, callbacks);
+    stopCurrentAudio();
+    const requestId = currentRequest;
+    if (callbacks.onstart) callbacks.onstart();
+
+    fetch(global.LILITH_CONFIG.WORKER_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'speak', text })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (requestId !== currentRequest) return; // stopped or superseded while loading
+        if (!data || !data.audio) throw new Error(data && data.message ? data.message : 'no audio returned');
+
+        const bytes = Uint8Array.from(atob(data.audio), c => c.charCodeAt(0));
+        const wav = pcmToWav(bytes, data.sampleRate || 24000, data.channels || 1, data.bitsPerSample || 16);
+        const url = URL.createObjectURL(new Blob([wav], { type: 'audio/wav' }));
+
+        const audio = new Audio(url);
+        currentAudio = audio;
+        const finish = () => {
+            URL.revokeObjectURL(url);
+            if (currentAudio === audio) currentAudio = null;
+            if (callbacks.onend) callbacks.onend();
+        };
+        audio.onended = finish;
+        audio.onerror = finish;
+        return audio.play();
+    })
+    .catch(err => {
+        // Voice is optional: if it fails, the text is still in the chat.
+        console.error('Lilith voice: could not play speech', err);
+        if (requestId === currentRequest && callbacks.onend) callbacks.onend();
+    });
 }
 
 function stopSpeaking() {
-    if (activeProvider.stop) activeProvider.stop();
+    stopCurrentAudio();
 }
 
 /* ---------------- Speech recognition (optional mic input) ------------- */
@@ -175,15 +136,12 @@ function stopListening() {
 function isListening() { return listening; }
 
 global.LilithVoice = {
-    getVoices,
     speak,
     stopSpeaking,
-    setSpeechProvider,
     isRecognitionSupported,
     startListening,
     stopListening,
-    isListening,
-    synthAvailable: true
+    isListening
 };
 
 })(window);

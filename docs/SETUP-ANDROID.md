@@ -111,10 +111,5 @@ Nothing here is required. Lilith works without any of it.
 - `CLOUDFLARE_API_TOKEN` — a Cloudflare API token with "Edit Cloudflare Workers" permission
 - `CLOUDFLARE_ACCOUNT_ID` — your account ID from the Cloudflare dashboard
 
-**Better voice (ElevenLabs)** (optional). In Cloudflare → Settings → Variables and Secrets, add:
-- `ELEVENLABS_API_KEY` (secret) and `ELEVENLABS_VOICE_ID` (the voice you want from ElevenLabs' voice library)
-
-When both are set, Lilith speaks with ElevenLabs. If it fails, she falls back to Gemini, then to the browser's voice.
-
 **Higher NASA limit** (optional). `NASA_API_KEY` as a secret. Without it, the app uses NASA's public `DEMO_KEY`, which works but is rate-limited.
 

@@ -22,7 +22,7 @@ The persona system prompt (`docs/lilith-persona.md`, Section 9) lives inside the
 
 **Live sky.** The Worker computes the current Moon phase and fetches NASA's astronomy picture of the day (cached for 6 hours), and gives both to Lilith as context.
 
-**Voice.** Gemini TTS is the default voice. If you set `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID` on the Worker, ElevenLabs is used instead. If the Worker voice fails, the browser's own voice takes over.
+**Voice.** Lilith speaks with one voice: Gemini's "Sulafat", set in `worker/lilith-worker.js`. There is no other voice option to set up.
 
 ## Setup
 
@@ -44,7 +44,7 @@ npx serve .
 - `js/lilith-config.js` — the one file you edit: your Worker's URL (no secrets)
 - `js/lilith-remote.js` — calls the Worker, handles timeouts/errors
 - `js/lilith-brain.js` — offline fallback: personality, StarChart13 knowledge base, local memory, random-thought bank
-- `js/lilith-voice.js` — Worker voice (Gemini or ElevenLabs), browser-voice fallback, stop/mute, optional mic input via the Web Speech API
+- `js/lilith-voice.js` — plays Lilith's voice (Gemini Sulafat), stop/mute, optional mic input via the Web Speech API
 - `js/lilith-core.js` — UI wiring, connection-state handling, ambient random-thought scheduler, settings persistence, particle background
 - `worker/lilith-worker.js` — deploy this to Cloudflare; holds the persona system prompt and calls the Gemini API using your secret key
 - `docs/lilith-persona.md` — the full character design document
@@ -53,7 +53,7 @@ npx serve .
 ## Current capabilities
 - Real Gemini-powered chat with typing animation, auto-scroll, and persistent memory across sessions
 - Offline demo brain as automatic fallback, with clear status indication
-- Voice replies: voice picker, speed/pitch/volume sliders, mute, stop; optional mic input where supported
+- Voice replies (one fixed voice), mute, stop; optional mic input where supported
 - Personality modes: Lilith (default), Astronomer, Storyteller, Teacher, Chaos, Silent
 - Random ambient thoughts on a timer (frequency + randomness configurable)
 - Wake/sleep greetings, glitch-intensity slider, dark cyberpunk theme throughout
@@ -67,14 +67,7 @@ npx serve .
 - Rejects oversized messages before they reach the API
 
 ## Built to extend later
-```js
-// Swap in a higher-quality voice (e.g. ElevenLabs) for speech
-LilithExtensions.registerVoiceProvider({
-  speak(text, opts, callbacks) { /* your provider */ },
-  stop() { /* ... */ }
-});
-```
-Other things designed to slot in later without a rewrite: real persistent memory (a database behind the Worker), live astronomy data, calendar integration, notifications, custom personalities, reader-marketplace hooks.
+Persistent memory, live astronomy data and calendar integration are already in place; further ideas: notifications, custom personalities, reader-marketplace hooks.
 
 ## Integrating into StarChart13 (later, when you're ready)
 When you share your actual StarChart13 files: copy `css/lilith.css`, `js/lilith-*.js`, and `worker/` in unchanged (or namespaced if there are naming collisions), add one nav tab + one section to your existing `index.html`, load the scripts, and leave your chart engine and all other features untouched.

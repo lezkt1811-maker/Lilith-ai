@@ -20,10 +20,6 @@
     mode: 'default',
     enableVoice: true,
     autoSpeak: true,
-    voiceName: 'Sulafat',
-    warmth: 50,
-    energy: 50,
-    pace: 50,
     enableRandomComments: true,
     talkFrequencyMinutes: 4,
     randomness: 50,
@@ -76,10 +72,6 @@
     stopBtn: $('#stop-btn'),
     ambientToast: $('#ambient-toast'),
     // settings
-    voiceSelect: $('#voice-select'),
-    warmthSlider: $('#warmth-slider'), warmthValue: $('#warmth-value'),
-    energySlider: $('#energy-slider'), energyValue: $('#energy-value'),
-    paceSlider: $('#pace-slider'), paceValue: $('#pace-value'),
     enableVoiceToggle: $('#enable-voice-toggle'),
     autoSpeakToggle: $('#auto-speak-toggle'),
     enableRandomToggle: $('#enable-random-toggle'),
@@ -363,11 +355,7 @@
     els.statusPill.classList.add('speaking');
     els.waveform.classList.add('active');
 
-    LilithVoice.speak(text, {
-      voiceName: settings.voiceName,
-      style: { warmth: settings.warmth, energy: settings.energy, pace: settings.pace },
-      muted
-    }, {
+    LilithVoice.speak(text, {}, {
       onend: () => { els.statusPill.classList.remove('speaking'); els.waveform.classList.remove('active'); },
       onerror: () => { els.statusPill.classList.remove('speaking'); els.waveform.classList.remove('active'); }
     });
@@ -428,12 +416,6 @@
   /* =========================================================
    * SETTINGS PANEL
    * ========================================================= */
-  els.voiceSelect.value = settings.voiceName;
-  els.voiceSelect.addEventListener('change', () => { settings.voiceName = els.voiceSelect.value; saveSettings(); });
-
-  bindSlider(els.warmthSlider, els.warmthValue, 'warmth', v => Math.round(v) + '%');
-  bindSlider(els.energySlider, els.energyValue, 'energy', v => Math.round(v) + '%');
-  bindSlider(els.paceSlider, els.paceValue, 'pace', v => Math.round(v) + '%');
   bindSlider(els.freqSlider, els.freqValue, 'talkFrequencyMinutes', v => `${Math.max(1, v - 1)}–${v + 2}`);
   bindSlider(els.randomnessSlider, els.randomnessValue, 'randomness', v => Math.round(v) + '%');
   bindSlider(els.glitchSlider, els.glitchValue, 'glitchIntensity', v => Math.round(v) + '%', (v) => {
@@ -567,8 +549,6 @@
   window.LilithExtensions = {
     /** Swap in a real AI backend for text replies. */
     registerAIProvider: (fn) => LilithBrain.setResponseProvider(fn),
-    /** Swap in a higher-quality voice engine (e.g. ElevenLabs). */
-    registerVoiceProvider: (provider) => LilithVoice.setSpeechProvider(provider),
     /** Read current settings object (read-only copy). */
     getSettings: () => Object.assign({}, settings)
   };
