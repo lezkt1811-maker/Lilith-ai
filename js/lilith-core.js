@@ -204,7 +204,7 @@
 
     if (LilithRemote.configured()) {
       try {
-        reply = await LilithRemote.sendMessage(text, sessionHistory.slice(-MAX_SESSION_HISTORY));
+        reply = await LilithRemote.sendMessage(text, sessionHistory.slice(-MAX_SESSION_HISTORY), settings.mode);
         setConnectionState(true);
       } catch (err) {
         setConnectionState(false, err);

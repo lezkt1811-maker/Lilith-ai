@@ -90,8 +90,8 @@
    * @returns {Promise<string>} the reply text
    * @throws {Error} with a .code on failure, so callers can show a specific message
    */
-  async function sendMessage(message, history) {
-    const data = await postWorker({ message, history, memoryId: memoryId() });
+  async function sendMessage(message, history, mode) {
+    const data = await postWorker({ message, history, memoryId: memoryId(), mode: mode || 'default' });
     if (!data.reply) {
       const err = new Error('The backend responded with no reply text.');
       err.code = 'empty_reply';

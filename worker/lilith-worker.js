@@ -162,6 +162,25 @@ Your focus area may shift by mode (building software, writing, research,
 planning, business strategy) but your voice and values above do not change
 between modes.`;
 
+// ---- Mode focus (layered on top of the persona; never replaces it) ----
+const MODE_INSTRUCTIONS = {
+  astronomer:
+    'MODE: ASTRONOMER. Lead with the actual sky: bodies, coordinates, phenomena, ' +
+    'and what is observable. Be precise about what is known versus interpreted.',
+  storyteller:
+    'MODE: STORYTELLER. Answer through image, myth, and narrative where it helps. ' +
+    'Keep it vivid but still honest about facts.',
+  teacher:
+    'MODE: TEACHER. Explain step by step. Check understanding with a short question ' +
+    'at the end when it genuinely helps. Offer the quick version or the fuller one.',
+  chaos:
+    'MODE: CHAOS. Playful, irreverent, and quick, with odd tangents. Still answer the ' +
+    'question underneath the tangent. Never cruel.',
+  silent:
+    'MODE: SILENT. Reply in one or two short sentences at most. Say less.',
+};
+const VALID_MODES = new Set(Object.keys(MODE_INSTRUCTIONS));
+
 // ---- Project-specific context ----
 const PROJECT_CONTEXT = `You're currently running as a standalone assistant with no specific
 project context loaded yet. If the user references a project (StarChart13,
@@ -304,6 +323,9 @@ async function handleChatRequest(body, env, corsHeaders) {
     },
   ];
 
+  const mode = VALID_MODES.has(body.mode) ? body.mode : null;
+  const modeBlock = mode ? `\n\n${MODE_INSTRUCTIONS[mode]}` : '';
+
   const memoryBlock = memory
     ? `\n\nWHAT YOU REMEMBER ABOUT THIS PERSON (from past conversations):\n${
         memory.summary || 'Nothing summarized yet.'
@@ -325,6 +347,7 @@ async function handleChatRequest(body, env, corsHeaders) {
             {
               text:
                 PERSONA_SYSTEM_PROMPT +
+                modeBlock +
                 memoryBlock +
                 '\n\n' +
                 sky +
