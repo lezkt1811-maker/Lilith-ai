@@ -12,9 +12,8 @@
 (function (global) {
   'use strict';
 
-  const wrap = () => document.getElementById('eye-wrap');
-  const mouth = () => document.getElementById('face-mouth');
-  const caption = () => document.getElementById('face-caption');
+  // There is one face on Home and one on Chat. Every copy moves together.
+  const each = (sel) => document.querySelectorAll(sel);
 
   let audioCtx = null;
   let analyser = null;
@@ -64,14 +63,13 @@
 
     // Boost quiet speech a little, and cap the opening so the mouth stays natural.
     const open = Math.min(1, level * 2.4);
-    const m = mouth();
-    if (m) m.style.height = (open * 3.2).toFixed(2) + '%';
+    each('.face-mouth').forEach((m) => { m.style.height = (open * 3.2).toFixed(2) + '%'; });
 
     if (activeAudio && activeAudio.duration) {
       const fraction = activeAudio.currentTime / activeAudio.duration;
       const shown = Math.min(words.length, Math.floor(fraction * words.length) + 1);
-      const c = caption();
-      if (c) c.textContent = words.slice(0, shown).join(' ');
+      const text = words.slice(0, shown).join(' ');
+      each('.face-caption').forEach((c) => { c.textContent = text; });
     }
   }
 
@@ -82,10 +80,8 @@
     words = String(text || '').split(/\s+/).filter(Boolean);
     connectAnalyser(audio);
 
-    const w = wrap();
-    if (w) w.classList.add('speaking');
-    const c = caption();
-    if (c) { c.textContent = ''; c.classList.add('show'); }
+    each('.face-wrap').forEach((w) => w.classList.add('speaking'));
+    each('.face-caption').forEach((c) => { c.textContent = ''; c.classList.add('show'); });
     loop();
   }
 
@@ -95,12 +91,9 @@
     rafId = null;
     activeAudio = null;
     analyser = null;
-    const m = mouth();
-    if (m) m.style.height = '0%';
-    const w = wrap();
-    if (w) w.classList.remove('speaking');
-    const c = caption();
-    if (c) { c.textContent = ''; c.classList.remove('show'); }
+    each('.face-mouth').forEach((m) => { m.style.height = '0%'; });
+    each('.face-wrap').forEach((w) => w.classList.remove('speaking'));
+    each('.face-caption').forEach((c) => { c.textContent = ''; c.classList.remove('show'); });
   }
 
   global.LilithFace = { start, stop };

@@ -659,3 +659,14 @@ input[type="range"] { accent-color: var(--purple); width: 100%; }
 }
 .face-caption.show { opacity: 1; }
 
+/* Smaller copy of the face at the top of the Chat screen */
+.face-wrap.face-small {
+  width: min(42vw, 170px);
+  margin: 0 auto 6px;
+}
+.chat-shell > .face-caption {
+  min-height: 2.6em;
+  font-size: 1rem;
+  margin-top: 2px;
+}
+
