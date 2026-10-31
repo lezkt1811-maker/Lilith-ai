@@ -63,7 +63,7 @@
 
     // Boost quiet speech a little, and cap the opening so the mouth stays natural.
     const open = Math.min(1, level * 2.4);
-    each('.face-mouth').forEach((m) => { m.style.height = (open * 3.2).toFixed(2) + '%'; });
+    each('.face-mouth').forEach((m) => { m.style.height = (open * 4.5).toFixed(2) + '%'; });
 
     if (activeAudio && activeAudio.duration) {
       const fraction = activeAudio.currentTime / activeAudio.duration;
