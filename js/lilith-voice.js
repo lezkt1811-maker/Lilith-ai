@@ -125,8 +125,8 @@ function startListening(onResult, onEnd) {
         const text = e.results[0][0].transcript;
         onResult && onResult(text);
     };
-    recognizer.onend = () => { listening = false; onEnd && onEnd(); };
-    recognizer.onerror = () => { listening = false; onEnd && onEnd(); };
+    recognizer.onend = () => { listening = false; onEnd && onEnd(null); };
+    recognizer.onerror = (e) => { listening = false; onEnd && onEnd(e && e.error ? e.error : 'error'); };
     recognizer.start();
     listening = true;
     return true;

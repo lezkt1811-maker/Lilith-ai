@@ -330,15 +330,65 @@
     els.attachHint.style.display = 'block';
   }
 
-  /* ---------------- mic input (progressive enhancement) ---------------- */
+  /* ---------------- hands-free conversation (progressive enhancement) ----------------
+   * Press the mic once to turn on hands-free talk: Lilith listens, sends each thing you
+   * say, and pauses listening while she speaks so she doesn't hear herself.
+   * Press the mic again to turn it off.
+   * ---------------------------------------------------------------- */
+  let handsFree = false;      // what you asked for: conversation on or off
+  let lilithSpeaking = false; // true while her voice is playing (listening is paused)
+  let listenTimer = null;
+
+  function startListeningLoop() {
+    if (!handsFree || lilithSpeaking || LilithVoice.isListening()) return;
+    els.micBtn.classList.add('listening');
+    LilithVoice.startListening(
+      (text) => { if (text && text.trim()) handleUserMessage(text.trim()); },
+      (errorCode) => {
+        if (errorCode === 'not-allowed' || errorCode === 'service-not-allowed') {
+          handsFree = false;
+          els.micBtn.classList.remove('listening');
+          addBubble("I can't hear you: the microphone is blocked. Allow microphone access for this site in your browser settings, then press the mic again.", 'ambient');
+          return;
+        }
+        if (handsFree && !lilithSpeaking) {
+          clearTimeout(listenTimer);
+          listenTimer = setTimeout(startListeningLoop, 250);
+        } else {
+          els.micBtn.classList.remove('listening');
+        }
+      }
+    );
+  }
+
+  /** Called as soon as her voice starts: stop listening so she doesn't hear herself. */
+  function pauseHandsFree() {
+    lilithSpeaking = true;
+    clearTimeout(listenTimer);
+    if (LilithVoice.isListening()) LilithVoice.stopListening();
+  }
+
+  /** Called when her voice ends or is cut off: listen again, after a short pause for echo to fade. */
+  function resumeHandsFree() {
+    lilithSpeaking = false;
+    if (handsFree) {
+      clearTimeout(listenTimer);
+      listenTimer = setTimeout(startListeningLoop, 500);
+    }
+  }
+
   if (LilithVoice.isRecognitionSupported()) {
     els.micBtn.addEventListener('click', () => {
-      if (LilithVoice.isListening()) { LilithVoice.stopListening(); return; }
-      els.micBtn.classList.add('listening');
-      LilithVoice.startListening(
-        (text) => { els.chatInput.value = ''; handleUserMessage(text); },
-        () => els.micBtn.classList.remove('listening')
-      );
+      if (handsFree) {
+        handsFree = false;
+        clearTimeout(listenTimer);
+        LilithVoice.stopListening();
+        els.micBtn.classList.remove('listening');
+        return;
+      }
+      handsFree = true;
+      if (!awake) awaken(); // talking to her wakes her, same as typing
+      startListeningLoop();
     });
   } else {
     els.micBtn.disabled = true;
@@ -354,10 +404,11 @@
 
     els.statusPill.classList.add('speaking');
     els.waveform.classList.add('active');
+    pauseHandsFree();
 
     LilithVoice.speak(text, {}, {
-      onend: () => { els.statusPill.classList.remove('speaking'); els.waveform.classList.remove('active'); },
-      onerror: () => { els.statusPill.classList.remove('speaking'); els.waveform.classList.remove('active'); }
+      onend: () => { els.statusPill.classList.remove('speaking'); els.waveform.classList.remove('active'); resumeHandsFree(); },
+      onerror: () => { els.statusPill.classList.remove('speaking'); els.waveform.classList.remove('active'); resumeHandsFree(); }
     });
   }
 
@@ -365,11 +416,12 @@
     muted = !muted;
     els.muteBtn.setAttribute('aria-pressed', String(muted));
     els.muteBtn.textContent = muted ? '🔇 Muted' : '🔊 Mute';
-    if (muted) LilithVoice.stopSpeaking();
+    if (muted) { LilithVoice.stopSpeaking(); resumeHandsFree(); }
   });
 
   els.stopBtn.addEventListener('click', () => {
     LilithVoice.stopSpeaking();
+    resumeHandsFree();
     els.statusPill.classList.remove('speaking');
     els.waveform.classList.remove('active');
   });
