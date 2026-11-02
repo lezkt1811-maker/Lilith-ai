@@ -28,7 +28,7 @@ const TTS_ENDPOINT =
   `https://generativelanguage.googleapis.com/v1beta/models/${TTS_MODEL}:generateContent`;
 
 // The one voice Lilith speaks with: Gemini's "Sulafat" (warm, free).
-const TTS_VOICE = 'Sulafat';
+const TTS_VOICE = 'Leda';
 const TTS_SAMPLE_RATE = 24000;
 const TTS_CHANNELS = 1;
 const TTS_BITS_PER_SAMPLE = 16;
@@ -525,16 +525,17 @@ async function handleSpeechRequest(body, env, corsHeaders) {
 
   const voicePrompt = `# AUDIO PROFILE: Lilith
 
-A mature feminine voice with a low, warm register.
+A young adult woman's voice: bright, clear, and confident, with a warm,
+natural tone.
 
-The voice feels intelligent, grounded, ancient, intimate, and
-self-possessed. She does not sound bubbly, girlish, sugary, chirpy,
-cartoonish, robotic, theatrical, or like a navigation system.
+The voice feels intelligent, self-assured, and easy to listen to. She does
+not sound old, elderly, or raspy. She does not sound childish, sugary,
+chirpy, cartoonish, robotic, theatrical, or like a navigation system.
 
 # DIRECTOR'S NOTES
 
 Tone:
-Quiet authority. Warm, but not overly sweet. Emotionally present without
+Confident and self-assured. Warm, but not overly sweet. Emotionally present without
 performing emotion.
 
 Energy:
